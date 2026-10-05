@@ -55,6 +55,8 @@ audio{height:34px;max-width:230px}.links a{display:block;color:var(--acc);font-s
 .lb{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:flex;flex-direction:column;align-items:center;overflow:auto;padding:12px;gap:10px}
 .lb img{margin:auto;max-width:95vw;max-height:84vh;cursor:zoom-in}.lb img.full{max-width:none;max-height:none;cursor:zoom-out}.lbm{margin:auto;color:#fff}
 details.card summary{outline:none}
+.item.sel{background:var(--bg)}.cell[type=number]{max-width:84px}
+textarea{overflow-y:hidden;resize:none}
 </style></head><body>
 <div id="lock" style="padding:20px">Loading Lifelog…</div>
 <main id="app" hidden></main>
@@ -143,37 +145,61 @@ async function signOut(){clearInterval(poll);key=null;D=emptyD();try{await sb.au
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
 
 // ---------- UI ----------
-function emptyD(){return{books:[],movies:[],days:{},projects:[],habits:[],daily:[],backlog:[],inv:{clothes:[],bathroom:[],cables:[]}}}
-function loadD(o){const d=Object.assign(emptyD(),o);d.inv=Object.assign({clothes:[],bathroom:[],cables:[]},d.inv);
- d.habits.forEach(x=>{x.done=x.done||{};x.desc=x.desc||{};x.notes=x.notes||[];x.daily=x.daily||[];x.ticks=x.ticks||{}});
- for(const k of Object.keys(d.days).sort()){const dy=d.days[k];dy.tasks=dy.tasks||[];dy.dd=dy.dd||[];
-  if(Array.isArray(dy.daily)){dy.daily.forEach(t=>{d.daily.push({id:t.id,text:t.text,from:k,until:shift(k,1)});if(t.done)dy.dd.push(t.id)});delete dy.daily}}
+function emptyD(){return{v:4,books:[],movies:[],albums:[],days:{},projects:[],habits:[],daily:[],backlog:[],inv:{clothes:[],bathroom:[],cables:[],custom:[]}}}
+function loadD(o){const ver=(o&&o.v)||0,d=Object.assign(emptyD(),o);d.inv=Object.assign({clothes:[],bathroom:[],cables:[],custom:[]},d.inv);
+ d.habits.forEach(x=>{x.done=x.done||{};x.desc=x.desc||{};x.notes=x.notes||[];x.daily=x.daily||[];x.daily.forEach(t=>{t.done=!!t.done;t.att=t.att||[]});x.notes.forEach(n=>{n.att=n.att||[];n.title=n.title||''})});
+ [d.inv.bathroom,d.inv.cables,...d.inv.custom.map(c=>c.items)].forEach(l=>l.forEach(x=>{if(x.qty==null)x.qty=1}));
+ d.projects.forEach(p=>{p.done=!!p.done});
+ for(const k of Object.keys(d.days).sort()){const dy=d.days[k];dy.tasks=dy.tasks||[];
+  if(Array.isArray(dy.daily)){dy.dd=dy.dd||[];dy.daily.forEach(t=>{d.daily.push({id:t.id,text:t.text,from:k});if(t.done)dy.dd.push(t.id)});delete dy.daily}}
+ if(ver<4){
+  d.daily.forEach(t=>{if(t.until&&t.until===shift(t.from,1))delete t.until});
+  for(const k of Object.keys(d.days).sort()){const dy=d.days[k];(dy.dd||[]).forEach(id=>{const t=d.daily.find(x=>x.id===id);if(t&&!t.doneOn)t.doneOn=k});delete dy.dd}
+  d.v=4}
  return d}
-const DAY=()=>D.days[day]||(D.days[day]={tasks:[],dd:[]});
-const LISTS={books:{noun:'book',st:[['reading','reading'],['want','want to read'],['read','read']]},
- movies:{noun:'movie',st:[['watching','watching'],['want','want to watch'],['watched','watched']]}};
+const DAY=()=>D.days[day]||(D.days[day]={tasks:[]});
+const LISTS={books:{noun:'book',ph:'author',st:[['reading','reading'],['want','want to read'],['read','read']]},
+ movies:{noun:'movie',ph:'year (e.g. 1999)',st:[['watching','watching'],['want','want to watch'],['watched','watched']]},
+ albums:{noun:'album',ph:'artist',st:[['listening','listening'],['want','want to listen'],['listened','listened']]}};
 const CATS=['bottoms','tops','outerwear','dresses'];
-let note='',openP=null,blOpen=false,hid=null,hsub='calendar',invTab='clothes',catOpen={};
+let note='',openP=null,blOpen=false,dlOpen=false,mSub='books',hid=null,hsub='calendar',invTab='clothes',catOpen={},invCat={},noteSel='new',noteEdit=false,draft={title:'',text:'',att:[]};
 let hCal={y:new Date().getFullYear(),m:new Date().getMonth(),year:false,sel:null};
 const q=encodeURIComponent,pad=n=>String(n).padStart(2,'0'),ymd=(y,m,d)=>y+'-'+pad(m+1)+'-'+pad(d);
 
 // ---- lookups (no accounts needed) ----
 async function jget(url){const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);
  try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error(r.status);return await r.json()}finally{clearTimeout(t)}}
-async function lookupMovie(title,year){
- if(OMDB_KEY){try{const r=await jget('https://www.omdbapi.com/?apikey='+OMDB_KEY+'&t='+q(title)+(year?'&y='+q(year):''));
-  if(r.Response==='True')return{by:r.Director!=='N/A'?r.Director:'',year:(r.Year||'').slice(0,4),img:r.Poster&&r.Poster!=='N/A'?r.Poster:''}}catch(e){}}
- const w=await jget('https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrlimit=1&gsrsearch='+q(title+(year?' '+year:'')+' film')+'&prop=pageimages|pageprops&piprop=thumbnail&pithumbsize=154&ppprop=wikibase_item');
+const norm=t=>(t||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const merge=(a,b)=>!a?b:!b?a:{by:a.by||b.by,year:a.year||b.year,img:a.img||b.img};
+async function wikiMovie(title,year){
+ const w=await jget('https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrlimit=1&gsrsearch='+q(title+(year?' '+year:'')+' film')+'&prop=pageimages|pageprops&piprop=thumbnail&pithumbsize=200&ppprop=wikibase_item');
  const pg=Object.values((w.query&&w.query.pages)||{})[0];if(!pg)return null;
- let by='';const id=pg.pageprops&&pg.pageprops.wikibase_item;
+ let by='',img=(pg.thumbnail&&pg.thumbnail.source)||'';const id=pg.pageprops&&pg.pageprops.wikibase_item;
+ if(!img){try{const r=await jget('https://en.wikipedia.org/api/rest_v1/page/summary/'+q(pg.title.replace(/ /g,'_')));img=(r.thumbnail&&r.thumbnail.source)||''}catch(e){}}
  if(id){try{const e=await jget('https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&origin=*&props=claims&ids='+id);
   const ids=((e.entities[id].claims||{}).P57||[]).map(c=>c.mainsnak.datavalue.value.id);
   if(ids.length){const l=await jget('https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&origin=*&props=labels&languages=en&ids='+ids.join('|'));
    by=ids.map(i=>l.entities[i].labels.en&&l.entities[i].labels.en.value).filter(Boolean).join(', ')}}catch(e){}}
- return{by,year:((pg.title.match(/\((\d{4}) film\)/)||[])[1])||'',img:(pg.thumbnail&&pg.thumbnail.source)||''}}
+ return{by,year:((pg.title.match(/\((\d{4}) film\)/)||[])[1])||'',img}}
+async function itunesMovie(title,year){
+ const l=((await jget('https://itunes.apple.com/search?media=movie&entity=movie&limit=15&term='+q(title))).results||[]).filter(x=>norm(x.trackName)===norm(title));
+ const m=(year&&l.find(x=>(x.releaseDate||'').startsWith(year)))||l[0];if(!m)return null;
+ return{by:m.artistName||'',year:(m.releaseDate||'').slice(0,4),img:(m.artworkUrl100||'').replace('100x100bb','200x300bb')}}
+async function lookupMovie(title,year){let r=null;
+ if(OMDB_KEY){try{const o=await jget('https://www.omdbapi.com/?apikey='+OMDB_KEY+'&t='+q(title)+(year?'&y='+q(year):''));
+  if(o.Response==='True')r={by:o.Director!=='N/A'?o.Director:'',year:(o.Year||'').slice(0,4),img:o.Poster&&o.Poster!=='N/A'?o.Poster:''}}catch(e){}}
+ if(r&&r.img&&r.by)return r;
+ try{r=merge(r,await wikiMovie(title,year))}catch(e){}
+ if(!r||!r.img||!r.by){try{r=merge(r,await itunesMovie(title,year))}catch(e){}}
+ return r}
 async function lookupBook(title,author){
  const d=(await jget('https://openlibrary.org/search.json?limit=1&fields=author_name,first_publish_year,cover_i&title='+q(title)+(author?'&author='+q(author):''))).docs[0];
  if(!d)return null;return{by:(d.author_name||[])[0]||'',year:d.first_publish_year||'',img:d.cover_i?'https://covers.openlibrary.org/b/id/'+d.cover_i+'-M.jpg':''}}
+
+async function lookupAlbum(title,artist){
+ const c=t=>t.replace(/"/g,''),r=await jget('https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=1&query='+q('releasegroup:"'+c(title)+'"'+(artist?' AND artist:"'+c(artist)+'"':'')));
+ const g=(r['release-groups']||[])[0];if(!g)return null;
+ return{by:(g['artist-credit']&&g['artist-credit'][0]&&g['artist-credit'][0].name)||'',year:(g['first-release-date']||'').slice(0,4),img:'https://coverartarchive.org/release-group/'+g.id+'/front-250'}}
 
 // ---- encrypted file storage (files are encrypted in the browser before upload) ----
 async function sealBytes(u8){const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,u8));
@@ -199,15 +225,15 @@ function delFiles(list){const p=(list||[]).map(m=>m.path).filter(Boolean);if(p.l
 async function openPdf(m){const w=window.open('','_blank');try{const u=URL.createObjectURL(await getFile(m));if(w)w.location.href=u;else location.href=u}catch(e){if(w)w.close();alert('could not open that file')}}
 function lightbox(m,onDel){const ov=h('div',{cls:'lb',on:{click:()=>ov.remove()}},h('div',{cls:'lbm'},'loading…'));document.body.append(ov);
  getFile(m).then(b=>{const img=h('img',{src:URL.createObjectURL(b),alt:'',on:{click:e=>{e.stopPropagation();img.classList.toggle('full')}}});
-  ov.replaceChildren(img,h('div',{cls:'lbm',style:'font-size:12px;margin:0'},'tap picture for full size · tap outside to close'),onDel?h('button',{cls:'chip',on:{click:e=>{e.stopPropagation();if(confirm('delete this picture?')){ov.remove();onDel()}}}},'delete picture'):null)})
+  ov.replaceChildren(img,h('div',{cls:'lbm',style:'font-size:12px;margin:0'},'tap picture for full size · tap outside to close'),...(onDel?[h('button',{cls:'chip',on:{click:e=>{e.stopPropagation();if(confirm('delete this picture?')){ov.remove();onDel()}}}},'delete picture')]:[]))})
  .catch(()=>ov.replaceChildren(h('div',{cls:'lbm'},'could not load image')))}
-function attView(m,owner){
+function attView(m,owner,ro){
  const del=h('button',{cls:'x','aria-label':'remove',on:{click:()=>{if(!confirm('remove this file?'))return;owner.att=owner.att.filter(a=>a!==m);delFiles([m]);save();render()}}},'×');let el;
  if(m.type.startsWith('audio/')){const b=h('button',{cls:'chip',on:{click:async()=>{b.textContent='loading…';try{const a=h('audio',{controls:'',src:URL.createObjectURL(await getFile(m))});b.replaceWith(a);a.play().catch(()=>{})}catch(e){b.textContent='could not load'}}}},'▶ '+m.name);el=b}
  else if(m.type==='application/pdf')el=h('div',{cls:'pdf',title:m.name,on:{click:()=>openPdf(m)}},m.thumb?h('img',{src:m.thumb,alt:''}):h('span',{},'pdf'),h('small',{},m.name));
  else if(m.type.startsWith('image/'))el=h('img',{cls:'thumb',src:m.thumb||'',alt:m.name,on:{click:()=>lightbox(m)}});
  else el=h('a',{cls:'chip',href:'#',on:{click:async e=>{e.preventDefault();try{const a=document.createElement('a');a.href=URL.createObjectURL(await getFile(m));a.download=m.name;a.click()}catch(x){alert('could not load file')}}}},'[file] '+m.name);
- return h('span',{cls:'att'},el,del)}
+ return h('span',{cls:'att'},el,ro?null:del)}
 function attachUI(owner){owner.att=owner.att||[];
  const btn=h('button',{cls:'chip',on:{click:()=>fi.click()}},'+ attach file');
  const fi=h('input',{type:'file',accept:'audio/*,application/pdf,.pdf,.doc,.docx,image/*',multiple:'',style:'display:none',on:{change:async e=>{const fs=[...e.target.files];if(!fs.length)return;btn.textContent='uploading…';
@@ -215,25 +241,34 @@ function attachUI(owner){owner.att=owner.att||[];
  return h('div',{cls:'atts'},...owner.att.map(m=>attView(m,owner)),fi,btn)}
 const chipRow=(items,cur,pick)=>h('div',{cls:'chips',style:'margin:10px 0'},items.map(([k,l])=>h('button',{cls:'chip'+(k===cur?' on':''),on:{click:()=>pick(k)}},l)));
 
-// ---- books & movies ----
+// ---- text boxes grow with their content ----
+const grow=t=>{if(!t.isConnected)return;t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px'};
+document.addEventListener('input',e=>{if(e.target.tagName==='TEXTAREA')grow(e.target)});
+// ---- media: books, movies, albums ----
+const look=(k,t,x)=>k==='movies'?lookupMovie(t,x):k==='books'?lookupBook(t,x):lookupAlbum(t,x);
 function mediaTab(k){const c=LISTS[k],mv=k==='movies',n=note;note='';
- const t=h('input',{cls:'keep',placeholder:c.noun+' title'}),a=h('input',{placeholder:mv?'year (e.g. 1999)':'author',inputmode:mv?'numeric':'text'}),
+ const t=h('input',{cls:'keep',placeholder:c.noun+' title'}),a=h('input',{placeholder:c.ph,inputmode:mv?'numeric':'text'}),
   s=h('select',{},c.st.map(([v,l])=>h('option',{value:v},l)));s.value=c.st[1][0];const btn=h('button',{cls:'b'},'add');
  const add=async()=>{const title=t.value.trim();if(!title)return;btn.disabled=true;btn.textContent='looking up…';
-  const typed=a.value.trim();let info=null;try{info=mv?await lookupMovie(title,typed):await lookupBook(title,typed)}catch(e){info=null}
+  const typed=a.value.trim();let info=null;try{info=await look(k,title,typed)}catch(e){info=null}
   const it={id:uid(),title,st:s.value,by:'',year:'',img:(info&&info.img)||''};
   if(mv){it.year=typed||(info&&info.year)||'';it.by=(info&&info.by)||''}else{it.by=typed||(info&&info.by)||'';it.year=(info&&info.year)||''}
-  note=info?'':'no match found online, so it was added without details.';D[k].unshift(it);save();render()};
+  note=!info?'no match found online, so it was added without details.':!it.img?'found details but no picture was available. use ↻ on the item to retry later.':'';
+  D[k].unshift(it);save();render()};
  btn.addEventListener('click',add);t.addEventListener('keydown',e=>e.key==='Enter'&&add());
  const out=[h('div',{cls:'card'},h('div',{cls:'row'},t),h('div',{cls:'row'},a),h('div',{cls:'row',style:'margin:0'},s,btn),n?h('div',{cls:'empty'},n):null)];
  for(const[v,l]of c.st){const items=D[k].filter(x=>x.st===v);
-  out.push(h('h2',{},l+' ('+items.length+')'),h('div',{cls:'card'},items.length?items.map(x=>{const sub=[x.by,x.year].filter(Boolean).join(' · ');
+  out.push(h('h2',{},l+' ('+items.length+')'),h('div',{cls:'card'},items.length?items.map(x=>{
+   const sub=(x.by||x.year)?h('small',{},x.by?h('span',{cls:mv?'keep':''},x.by):null,x.by&&x.year?' · ':null,x.year?String(x.year):null):null;
+   const rf=h('button',{cls:'x','aria-label':'fetch details',title:'fetch details',on:{click:async()=>{rf.textContent='…';
+    try{const i=await look(k,x.title,mv?x.year:x.by);if(i){x.img=x.img||i.img;x.by=x.by||i.by;x.year=x.year||i.year;save()}}catch(e){}render()}}},'↻');
    return h('div',{cls:'item'},x.img?h('img',{cls:'cover',src:x.img,alt:'',loading:'lazy',on:{error:e=>{e.target.style.visibility='hidden'}}}):null,
-    h('div',{cls:'t'},h('span',{cls:'keep'},x.title),sub?h('small',{},sub):null),
+    h('div',{cls:'t'},h('span',{cls:'keep'},x.title),sub),x.img?null:rf,
     h('select',{on:{change:e=>{x.st=e.target.value;save();render()}}},c.st.map(([v2,l2])=>{const o=h('option',{value:v2},l2);if(v2===x.st)o.selected=true;return o})),
     h('button',{cls:'x','aria-label':'delete',on:{click:()=>{D[k]=D[k].filter(y=>y!==x);save();render()}}},'×'))}):h('div',{cls:'empty'},'nothing here yet.')))}
- out.push(h('div',{cls:'empty',style:'margin-top:16px'},mv?'movie info comes from wikipedia/wikidata (or omdb if you add a key). the title you type is sent there to look it up.':'book info and covers come from open library. the title you type is sent there to look it up.'));
+ out.push(h('div',{cls:'empty',style:'margin-top:16px'},{movies:'movie info comes from wikipedia, wikidata and itunes (or omdb if you add a key). the title you type is sent there to look it up.',books:'book info and covers come from open library. the title you type is sent there to look it up.',albums:'album info comes from musicbrainz and the cover art archive. the title you type is sent there to look it up.'}[k]));
  return out}
+const mediaPage=()=>[chipRow([['books','books'],['movies','movies'],['albums','albums']],mSub,k=>{mSub=k;render()}),...mediaTab(mSub)];
 
 // ---- to-do ----
 function taskList(list,ph){const inp=h('input',{placeholder:ph});
@@ -243,26 +278,19 @@ function taskList(list,ph){const inp=h('input',{placeholder:ph});
   h('input',{type:'checkbox',checked:x.done,on:{change:e=>{x.done=e.target.checked;save();render()}}}),h('div',{cls:'t'},x.text),
   h('button',{cls:'x','aria-label':'delete',on:{click:()=>{list.splice(list.indexOf(x),1);save();render()}}},'×'))):h('div',{cls:'empty'},'nothing yet.'),
   h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add')))}
-function dailyCard(){const items=D.daily.filter(t=>t.from<=day&&(!t.until||day<t.until)),dd=DAY().dd,inp=h('input',{placeholder:'add a daily task (repeats every day)'});
+function dailySec(){const vis=D.daily.filter(t=>t.from<=day&&(!t.until||day<t.until)&&(!t.doneOn||day<t.doneOn)),inp=h('input',{placeholder:'add a daily task'});
  const add=()=>{const v=inp.value.trim();if(!v)return;D.daily.push({id:uid(),text:v,from:day});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
- return h('div',{cls:'card'},items.length?items.map(t=>{const on=dd.includes(t.id);return h('div',{cls:'item'+(on?' done':'')},
-  h('input',{type:'checkbox',checked:on,on:{change:e=>{const i=dd.indexOf(t.id);if(e.target.checked&&i<0)dd.push(t.id);if(!e.target.checked&&i>=0)dd.splice(i,1);save();render()}}}),h('div',{cls:'t'},t.text),
-  h('button',{cls:'x','aria-label':'remove from this day onward',on:{click:()=>{if(t.from>=day)D.daily=D.daily.filter(y=>y!==t);else t.until=day;save();render()}}},'×'))}):h('div',{cls:'empty'},'nothing yet.'),
-  h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add')))}
-function backlogSec(){const open=D.backlog.filter(x=>!x.done),inp=h('input',{placeholder:'something for down-time'});
- const add=()=>{const v=inp.value.trim();if(!v)return;D.backlog.push({id:uid(),text:v,added:today(),done:false});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
- const age=a=>Math.max(0,Math.round((new Date(today())-new Date(a))/864e5));
- const d=h('details',{},h('summary',{},'backlog ('+open.length+')'),h('div',{cls:'card'},open.length?open.map(x=>h('div',{cls:'item'},
-  h('input',{type:'checkbox',on:{change:()=>{x.done=true;x.doneOn=today();save();render()}}}),h('div',{cls:'t'},x.text,h('small',{},'added '+x.added+' · '+age(x.added)+'d ago')),
-  h('button',{cls:'x','aria-label':'delete',on:{click:()=>{D.backlog=D.backlog.filter(y=>y!==x);save();render()}}},'×'))):h('div',{cls:'empty'},'nothing waiting. tick an item to clear it for good.'),
+ const d=h('details',{},h('summary',{},'daily tasks ('+vis.length+')'),h('div',{cls:'card'},vis.length?vis.map(t=>h('div',{cls:'item'},
+  h('input',{type:'checkbox',on:{change:()=>{t.doneOn=day;save();render()}}}),h('div',{cls:'t'},t.text,h('small',{},'since '+t.from)),
+  h('button',{cls:'x','aria-label':'remove from today onward',on:{click:()=>{if(t.from>=day)D.daily=D.daily.filter(y=>y!==t);else t.until=day;save();render()}}},'×'))):h('div',{cls:'empty'},'nothing for this day. tasks you add stay on every day until you tick them.'),
   h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add'))));
- if(blOpen)d.setAttribute('open','');d.addEventListener('toggle',()=>{blOpen=d.open});return d}
-function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].tasks.length+D.days[k].dd.length).sort().reverse();
+ if(dlOpen)d.setAttribute('open','');d.addEventListener('toggle',()=>{dlOpen=d.open});return d}
+function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].tasks.length).sort().reverse();
  const dp=h('input',{type:'date',value:day,on:{change:e=>{if(e.target.value){day=e.target.value;render()}}}});
  return[h('div',{cls:'date'},h('button',{cls:'b',on:{click:()=>{day=shift(day,-1);render()}}},'‹'),h('div',{style:'text-align:center'},h('strong',{},fmt(day)),h('div',{},dp)),h('button',{cls:'b',on:{click:()=>{day=shift(day,1);render()}}},'›')),
   day!==today()?h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{day=today();render()}}},'jump to today')):null,
   h('h2',{},'to-do'),taskList(d.tasks,'add a task for this day'),
-  h('h2',{},'daily tasks (carry forward until removed)'),dailyCard(),
+  h('div',{style:'margin-top:14px'},dailySec()),
   h('h2',{},'past entries'),h('div',{cls:'chips'},past.length?past.map(k=>h('button',{cls:'chip'+(k===day?' on':''),on:{click:()=>{day=k;render()}}},k)):h('span',{cls:'empty'},'entries you add will be listed here.')),
   h('div',{style:'margin-top:18px'},backlogSec())]}
 
@@ -272,24 +300,32 @@ function projectsTab(){const p=openP&&D.projects.find(x=>x.id===openP);
   h('h2',{},'title'),h('input',{value:p.title,placeholder:'title',style:'width:100%;font-weight:700',on:{input:e=>{p.title=e.target.value;save()}}}),
   h('h2',{},'description'),h('textarea',{rows:'4',placeholder:'what is this project about?',value:p.desc||'',on:{input:e=>{p.desc=e.target.value;save()}}}),
   h('h2',{},'to-do'),taskList(p.todos,'add a to-do item'),
-  h('div',{style:'margin-top:20px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('delete this project?')){D.projects=D.projects.filter(x=>x!==p);openP=null;save();render()}}}},'delete project'))];
+  h('div',{cls:'chips',style:'margin-top:20px'},h('button',{cls:'chip'+(p.done?' on':''),on:{click:()=>{p.done=!p.done;save();openP=null;render()}}},p.done?'completed ✓ (tap to reopen)':'mark completed'),
+   h('button',{cls:'chip',on:{click:()=>{if(confirm('delete this project?')){D.projects=D.projects.filter(x=>x!==p);openP=null;save();render()}}}},'delete project'))];
  openP=null;const n=h('input',{placeholder:'new project title'});
- const add=()=>{const title=n.value.trim();if(!title)return;const np={id:uid(),title,desc:'',todos:[]};D.projects.unshift(np);openP=np.id;save();render()};n.addEventListener('keydown',e=>e.key==='Enter'&&add());
- return[h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},n,h('button',{cls:'b',on:{click:add}},'add'))),h('h2',{},'projects ('+D.projects.length+')'),
-  h('div',{cls:'card'},D.projects.length?D.projects.map(x=>h('div',{cls:'item'},h('div',{cls:'t proj',on:{click:()=>{openP=x.id;render()}}},x.title||'untitled'),h('small',{style:'color:var(--mut)'},x.todos.filter(t=>!t.done).length+' open'))):h('div',{cls:'empty'},'no projects yet.'))]}
+ const add=()=>{const title=n.value.trim();if(!title)return;const np={id:uid(),title,desc:'',todos:[],done:false};D.projects.unshift(np);openP=np.id;save();render()};n.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ const list=(arr,empty)=>h('div',{cls:'card'},arr.length?arr.map(x=>h('div',{cls:'item'},
+  h('input',{type:'checkbox',checked:x.done,'aria-label':'completed',on:{change:e=>{x.done=e.target.checked;save();render()}}}),
+  h('div',{cls:'t proj',on:{click:()=>{openP=x.id;render()}}},x.title||'untitled'),h('small',{style:'color:var(--mut)'},x.todos.filter(t=>!t.done).length+' open'))):h('div',{cls:'empty'},empty));
+ const w=D.projects.filter(x=>!x.done),c=D.projects.filter(x=>x.done);
+ return[h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},n,h('button',{cls:'b',on:{click:add}},'add'))),
+  h('h2',{},'working ('+w.length+')'),list(w,'no projects in progress.'),h('h2',{},'completed ('+c.length+')'),list(c,'nothing completed yet.')]}
 
 // ---- habits ----
 const mname=(y,m)=>new Date(y,m,1).toLocaleDateString(undefined,{month:'long'});
-function habitCal(hb){const td=today(),cells={},
- cnt=h('div',{cls:'empty',style:'text-align:center;margin:6px 0'}),panel=h('div',{cls:'card',style:'margin:8px 0'});
- const upd=()=>{const pre=hCal.year?hCal.y+'-':hCal.y+'-'+pad(hCal.m+1)+'-',c=Object.keys(hb.done).filter(k=>k.startsWith(pre)).length;
-  cnt.textContent=c+' day'+(c===1?'':'s')+' in '+(hCal.year?hCal.y:mname(hCal.y,hCal.m)+' '+hCal.y)};
+function habitCal(hb){const td=today(),cells={},cnt=h('div',{cls:'empty',style:'text-align:center;margin:6px 0'}),panel=h('div',{cls:'card',style:'margin:8px 0'}),entries=h('div',{cls:'card'});
+ const pre=()=>hCal.year?hCal.y+'-':hCal.y+'-'+pad(hCal.m+1)+'-';
  const paint=()=>{for(const[k,b]of Object.entries(cells))b.className=(hb.done[k]?'on ':'')+(hb.desc[k]?'dot ':'')+(k===td?'today ':'')+(k===hCal.sel?'sel':'')};
- const draw=()=>{panel.replaceChildren();const k=hCal.sel;if(!k){panel.append(h('div',{cls:'empty'},'tap a date to mark it done, then write what you did.'));return}
-  const lab=()=>hb.done[k]?'performed ✓':'not performed',tg=h('button',{cls:'chip'+(hb.done[k]?' on':''),on:{click:()=>{if(hb.done[k])delete hb.done[k];else hb.done[k]=1;tg.className='chip'+(hb.done[k]?' on':'');tg.textContent=lab();save();paint();upd()}}},lab());
-  panel.append(h('div',{cls:'row',style:'justify-content:space-between;align-items:center'},h('strong',{},fmt(k)),tg),
-   h('textarea',{rows:'3',placeholder:'what did you do?',value:hb.desc[k]||'',on:{input:e=>{const v=e.target.value;if(v.trim())hb.desc[k]=v;else delete hb.desc[k];save();paint()}}}))};
- const pick=k=>{hCal.sel=k;if(!hb.done[k])hb.done[k]=1;save();paint();draw();upd()};
+ const drawEntries=()=>{const ks=Object.keys(hb.done).filter(k=>k.startsWith(pre())).sort();
+  entries.replaceChildren(...(ks.length?ks.map(k=>h('div',{cls:'item'+(k===hCal.sel?' sel':'')},
+   h('div',{cls:'t',style:'cursor:pointer',on:{click:()=>{hCal.sel=k;paint();draw();drawEntries()}}},k,hb.desc[k]?h('small',{},hb.desc[k]):null),
+   h('button',{cls:'x','aria-label':'delete this day',on:{click:()=>del(k)}},'×'))):[h('div',{cls:'empty'},'no days marked here yet.')]))};
+ const upd=()=>{const c=Object.keys(hb.done).filter(k=>k.startsWith(pre())).length;cnt.textContent=c+' day'+(c===1?'':'s')+' in '+(hCal.year?hCal.y:mname(hCal.y,hCal.m)+' '+hCal.y);drawEntries()};
+ const draw=()=>{panel.replaceChildren();const k=hCal.sel;if(!k){panel.append(h('div',{cls:'empty'},'tap a date to mark it, then write what you did. tap a marked date again to delete it.'));return}
+  panel.append(h('div',{cls:'row',style:'justify-content:space-between;align-items:center'},h('strong',{},fmt(k)),h('button',{cls:'chip',on:{click:()=>del(k)}},'delete day')),
+   h('textarea',{rows:'3',placeholder:'what did you do?',value:hb.desc[k]||'',on:{input:e=>{const v=e.target.value;if(v.trim())hb.desc[k]=v;else delete hb.desc[k];save();paint();drawEntries()}}}));panel.querySelectorAll('textarea').forEach(grow)};
+ const del=k=>{if(hb.desc[k]&&!confirm('delete this day and its note?'))return;delete hb.done[k];delete hb.desc[k];if(hCal.sel===k)hCal.sel=null;save();paint();draw();upd()};
+ const pick=k=>{if(hb.done[k])return del(k);hb.done[k]=1;hCal.sel=k;save();paint();draw();upd()};
  const month=(y,m)=>{const first=new Date(y,m,1).getDay(),nd=new Date(y,m+1,0).getDate(),cal=h('div',{cls:'cal'},['s','m','t','w','t','f','s'].map(w=>h('span',{},w)));
   for(let i=0;i<first;i++)cal.append(h('i'));
   for(let d=1;d<=nd;d++){const k=ymd(y,m,d),b=h('button',{'aria-label':k,on:{click:()=>pick(k)}},String(d));cells[k]=b;cal.append(b)}
@@ -299,26 +335,40 @@ function habitCal(hb){const td=today(),cells={},
  if(hCal.year)for(let m=0;m<12;m++)grid.append(month(hCal.y,m));else grid.append(month(hCal.y,hCal.m));
  paint();draw();upd();
  return[h('div',{cls:'date'},h('button',{cls:'b',on:{click:()=>go(-1)}},'‹'),h('strong',{},hCal.year?String(hCal.y):mname(hCal.y,hCal.m)+' '+hCal.y),h('button',{cls:'b',on:{click:()=>go(1)}},'›')),
-  h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{hCal.year=!hCal.year;render()}}},hCal.year?'month view':'year view')),cnt,panel,grid]}
-function habitNotes(hb){const out=[h('div',{style:'margin-bottom:8px'},h('button',{cls:'b',on:{click:()=>{hb.notes.unshift({id:uid(),text:'',at:today(),att:[]});save();render()}}},'new note'))];
- if(!hb.notes.length)out.push(h('div',{cls:'empty'},'no notes yet. attach audio, pdfs or word files, or paste links.'));
- for(const n of hb.notes){const links=h('div',{cls:'links'}),paint=()=>links.replaceChildren(...(n.text.match(/https?:\/\/[^\s]+/g)||[]).map(u=>h('a',{href:u,target:'_blank',rel:'noopener noreferrer'},u)));paint();
-  out.push(h('div',{cls:'card',style:'margin-bottom:10px'},h('div',{cls:'row',style:'justify-content:space-between;align-items:center;margin:0 0 6px'},h('small',{style:'color:var(--mut)'},n.at),
-   h('button',{cls:'x','aria-label':'delete note',on:{click:()=>{if(confirm('delete this note?')){delFiles(n.att);hb.notes=hb.notes.filter(y=>y!==n);save();render()}}}},'×')),
-   h('textarea',{rows:'4',placeholder:'write a note, paste links…',value:n.text,on:{input:e=>{n.text=e.target.value;save();paint()}}}),links,attachUI(n)))}
+  h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{hCal.year=!hCal.year;render()}}},hCal.year?'month view':'year view')),cnt,panel,grid,h('h2',{},'marked days'),entries]}
+const noteLabel=n=>(n.title||(n.text||'').trim().slice(0,22)||'untitled')+' · '+n.at;
+const enterDo=fn=>e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();fn()}};
+const linksOf=n=>h('div',{cls:'links'},...(String(n.text||'').match(/https?:\/\/[^\s]+/g)||[]).map(u=>h('a',{href:u,target:'_blank',rel:'noopener noreferrer'},u)));
+function habitNotes(hb){const sel=hb.notes.find(n=>n.id===noteSel);if(!sel&&noteSel!=='new')noteSel='new';
+ const out=[chipRow([['new','+ new note'],...hb.notes.map(n=>[n.id,noteLabel(n)])],noteSel,k=>{noteSel=k;noteEdit=false;render()})];
+ if(noteSel==='new'){
+  const go=()=>{if(!draft.title.trim()&&!draft.text.trim()&&!draft.att.length)return;
+   const n={id:uid(),title:draft.title.trim()||draft.text.trim().slice(0,30),text:draft.text,at:today(),att:draft.att};hb.notes.unshift(n);draft={title:'',text:'',att:[]};noteSel=n.id;noteEdit=false;save();render()};
+  out.push(h('div',{cls:'card'},h('input',{placeholder:'title',value:draft.title,style:'width:100%;margin-bottom:8px',on:{input:e=>{draft.title=e.target.value}}}),
+   h('textarea',{rows:'5',placeholder:'write a note…',value:draft.text,on:{input:e=>{draft.text=e.target.value}}}),
+   attachUI(draft),h('div',{style:'margin-top:10px'},h('button',{cls:'b',on:{click:go}},'save'))))}
+ else{const n=sel,del=()=>{if(!confirm('delete this note?'))return;delFiles(n.att);hb.notes=hb.notes.filter(y=>y!==n);noteSel='new';noteEdit=false;save();render()};
+  if(!noteEdit)out.push(h('div',{cls:'card'},h('div',{cls:'row',style:'justify-content:space-between;align-items:center;margin:0 0 8px'},h('strong',{},n.title||'untitled'),h('small',{style:'color:var(--mut)'},n.at)),
+   h('div',{style:'white-space:pre-wrap;overflow-wrap:anywhere'},n.text),linksOf(n),h('div',{cls:'atts'},...n.att.map(m=>attView(m,n,true))),
+   h('div',{cls:'chips',style:'margin-top:12px'},h('button',{cls:'chip',on:{click:()=>{noteEdit=true;render()}}},'edit'),h('button',{cls:'chip',on:{click:del}},'delete note'))));
+  else{const done=()=>{noteEdit=false;save();render()};
+   out.push(h('div',{cls:'card'},h('input',{placeholder:'title',value:n.title||'',style:'width:100%;margin-bottom:8px',on:{input:e=>{n.title=e.target.value;save()}}}),
+    h('textarea',{rows:'5',value:n.text||'',on:{input:e=>{n.text=e.target.value;save()}}}),attachUI(n),
+    h('div',{cls:'chips',style:'margin-top:10px'},h('button',{cls:'b',on:{click:done}},'save'),h('button',{cls:'chip',on:{click:del}},'delete note'))))}}
  return out}
-function habitDaily(hb){const td=today(),tk=hb.ticks[td]=hb.ticks[td]||[],inp=h('input',{placeholder:'add a daily item'});
- const add=()=>{const v=inp.value.trim();if(!v)return;hb.daily.push({id:uid(),text:v,att:[]});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
- return[h('div',{cls:'empty'},'a checklist for this habit. checks reset each day ('+td+').'),
-  h('div',{cls:'card'},hb.daily.length?hb.daily.map(x=>{const on=tk.includes(x.id);return h('div',{cls:'item'+(on?' done':''),style:'flex-wrap:wrap'},
-   h('input',{type:'checkbox',checked:on,on:{change:e=>{const i=tk.indexOf(x.id);if(e.target.checked&&i<0)tk.push(x.id);if(!e.target.checked&&i>=0)tk.splice(i,1);save();render()}}}),h('div',{cls:'t'},x.text),
-   h('button',{cls:'x','aria-label':'delete',on:{click:()=>{delFiles(x.att);hb.daily=hb.daily.filter(y=>y!==x);save();render()}}},'×'),h('div',{style:'width:100%;padding-left:28px'},attachUI(x)))}):h('div',{cls:'empty'},'nothing yet.'),
+function habitDaily(hb){const inp=h('input',{placeholder:'add a daily item'});
+ const add=()=>{const v=inp.value.trim();if(!v)return;hb.daily.push({id:uid(),text:v,done:false,att:[]});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ return[h('div',{cls:'empty'},'a checklist for this habit. checks stay until you untick them.'),
+  h('div',{cls:'card'},hb.daily.length?hb.daily.map(x=>h('div',{cls:'item'+(x.done?' done':''),style:'flex-wrap:wrap'},
+   h('input',{type:'checkbox',checked:x.done,on:{change:e=>{x.done=e.target.checked;save();render()}}}),h('div',{cls:'t'},x.text),
+   h('button',{cls:'x','aria-label':'delete',on:{click:()=>{delFiles(x.att);hb.daily=hb.daily.filter(y=>y!==x);save();render()}}},'×'),h('div',{style:'width:100%;padding-left:28px'},attachUI(x)))):h('div',{cls:'empty'},'nothing yet.'),
    h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add')))]}
 function habitsTab(){const n=h('input',{placeholder:'new habit (e.g. meditate)'});
- const add=()=>{const name=n.value.trim();if(!name)return;const id=uid();D.habits.push({id,name,done:{},desc:{},notes:[],daily:[],ticks:{}});hid=id;hsub='calendar';
+ const reset=()=>{noteSel='new';noteEdit=false;hCal.sel=null};
+ const add=()=>{const name=n.value.trim();if(!name)return;const id=uid();D.habits.push({id,name,done:{},desc:{},notes:[],daily:[]});hid=id;hsub='calendar';reset();
   hCal={y:new Date().getFullYear(),m:new Date().getMonth(),year:false,sel:null};save();render()};n.addEventListener('keydown',e=>e.key==='Enter'&&add());
  const out=[h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},n,h('button',{cls:'b',on:{click:add}},'add habit'))),
-  chipRow(D.habits.map(x=>[x.id,x.name]),hid,k=>{hid=k;hsub='calendar';hCal.sel=null;render()})];
+  chipRow(D.habits.map(x=>[x.id,x.name]),hid,k=>{hid=k;hsub='calendar';reset();render()})];
  const hb=D.habits.find(x=>x.id===hid);
  if(!hb){hid=null;out.push(h('div',{cls:'empty'},D.habits.length?'pick a habit above.':'add your first habit above.'));return out}
  out.push(h('h2',{},hb.name),chipRow([['calendar','calendar'],['notes','notes'],['daily','daily']],hsub,k=>{hsub=k;render()}),
@@ -327,8 +377,16 @@ function habitsTab(){const n=h('input',{placeholder:'new habit (e.g. meditate)'}
  return out}
 
 // ---- inventory ----
+function backlogSec(){const open=D.backlog.filter(x=>!x.done),inp=h('input',{placeholder:'something for down-time'});
+ const add=()=>{const v=inp.value.trim();if(!v)return;D.backlog.push({id:uid(),text:v,added:today(),done:false});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ const age=a=>Math.max(0,Math.round((new Date(today())-new Date(a))/864e5));
+ const d=h('details',{},h('summary',{},'backlog ('+open.length+')'),h('div',{cls:'card'},open.length?open.map(x=>h('div',{cls:'item'},
+  h('input',{type:'checkbox',on:{change:()=>{x.done=true;x.doneOn=today();save();render()}}}),h('div',{cls:'t'},x.text,h('small',{},'added '+x.added+' · '+age(x.added)+'d ago')),
+  h('button',{cls:'x','aria-label':'delete',on:{click:()=>{D.backlog=D.backlog.filter(y=>y!==x);save();render()}}},'×'))):h('div',{cls:'empty'},'nothing waiting. tick an item to clear it for good.'),
+  h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add'))));
+ if(blOpen)d.setAttribute('open','');d.addEventListener('toggle',()=>{blOpen=d.open});return d}
 function editTable(arr,cols,first,onDel){
- const rows=arr.map(x=>h('tr',{},first?h('td',{},first(x)):null,...cols.map(([k])=>h('td',{},h('input',{cls:'cell',value:x[k]||'',on:{input:e=>{x[k]=e.target.value;save()}}}))),
+ const rows=arr.map(x=>h('tr',{},first?h('td',{},first(x)):null,...cols.map(([k])=>h('td',{},k==='qty'?h('input',{cls:'cell',type:'number',min:'0',value:String(x.qty==null?1:x.qty),on:{input:e=>{x.qty=Math.max(0,parseInt(e.target.value)||0);save()}}}):h('input',{cls:'cell',value:x[k]||'',on:{input:e=>{x[k]=e.target.value;save()}}}))),
   h('td',{},h('button',{cls:'x','aria-label':'delete',on:{click:()=>{if(confirm('delete this item?'))onDel(x)}}},'×'))));
  return h('div',{style:'overflow-x:auto'},h('table',{cls:'tbl'},h('thead',{},h('tr',{},first?h('th',{},'pictures'):null,...cols.map(([,l])=>h('th',{},l)),h('th',{}))),h('tbody',{},...rows)))}
 function quickAdd(fields,add){const ins=fields.map(([k,ph,list])=>{const i=h('input',{placeholder:ph});if(list)i.setAttribute('list',list);return i}),btn=h('button',{cls:'b'},'add');
@@ -348,23 +406,34 @@ function clothesCat(c){const items=D.inv.clothes.filter(x=>x.cat===c);
   h('div',{cls:'row',style:'align-items:center'},files,btn),h('div',{cls:'empty',style:'margin-bottom:8px'},'up to 3 pictures. tap one later to see it full size.'),
   items.length?editTable(items,[['name','item'],['price','price'],['size','size'],['company','company']],pics,x=>{D.inv.clothes=D.inv.clothes.filter(y=>y!==x);delFiles(x.imgs);save();render()}):h('div',{cls:'empty'},'nothing here yet.')));
  if(catOpen[c])d.setAttribute('open','');d.addEventListener('toggle',()=>{catOpen[c]=d.open});return d}
-function inventoryTab(){const out=[chipRow([['clothes','clothes'],['bathroom','bathroom items'],['cables','cables']],invTab,k=>{invTab=k;render()})];
+function mergeAdd(list,o,byCat){const n=Math.max(1,parseInt(o.qty)||1),k=v=>(v||'').trim().toLowerCase();
+ const ex=list.find(x=>k(x.item)===k(o.item)&&(!byCat||k(x.category)===k(o.category)));
+ if(ex)ex.qty=(Number(ex.qty)||0)+n;else{const it={id:uid(),item:o.item,qty:n};if(byCat)it.category=o.category||'';list.push(it)}}
+function itemsSection(key,list){const cats=[...new Set(list.map(x=>x.category).filter(Boolean))].sort(),lid='cats-'+key;
+ if(invCat[key]&&invCat[key]!=='all'&&!cats.includes(invCat[key]))invCat[key]='all';const cur=invCat[key]||'all';
+ const out=[h('datalist',{id:lid},cats.map(c=>h('option',{value:c}))),quickAdd([['item','item'],['category','category',lid],['qty','qty (default 1)']],o=>mergeAdd(list,o,true))];
+ if(cats.length)out.push(chipRow([['all','all'],...cats.map(c=>[c,c])],cur,k=>{invCat[key]=k;render()}));
+ const rows=cur==='all'?list:list.filter(x=>x.category===cur),del=x=>{const i=list.indexOf(x);if(i>=0)list.splice(i,1);save();render()};
+ out.push(rows.length?editTable(rows,cur==='all'?[['item','item'],['category','category'],['qty','qty']]:[['item','item'],['qty','qty']],null,del):h('div',{cls:'empty'},'nothing here yet.'));
+ return out}
+function inventoryTab(){const tabs=[['clothes','clothes'],['bathroom','bathroom items'],['cables','cables'],...D.inv.custom.map(c=>[c.id,c.name])];
+ if(!tabs.some(t=>t[0]===invTab))invTab='clothes';const out=[chipRow(tabs,invTab,k=>{invTab=k;render()})];
  if(invTab==='clothes')CATS.forEach(c=>out.push(clothesCat(c)));
- else if(invTab==='bathroom'){const cats=[...new Set(D.inv.bathroom.map(x=>x.category).filter(Boolean))];
-  out.push(h('datalist',{id:'bcats'},cats.map(c=>h('option',{value:c}))),quickAdd([['item','item'],['category','category','bcats']],o=>D.inv.bathroom.push({id:uid(),...o})),
-   D.inv.bathroom.length?editTable(D.inv.bathroom,[['item','item'],['category','category']],null,x=>{D.inv.bathroom=D.inv.bathroom.filter(y=>y!==x);save();render()}):h('div',{cls:'empty'},'nothing here yet.'))}
- else out.push(quickAdd([['item','cable']],o=>D.inv.cables.push({id:uid(),...o})),
-  D.inv.cables.length?editTable(D.inv.cables,[['item','item']],null,x=>{D.inv.cables=D.inv.cables.filter(y=>y!==x);save();render()}):h('div',{cls:'empty'},'nothing here yet.'));
+ else if(invTab==='bathroom')out.push(...itemsSection('bathroom',D.inv.bathroom));
+ else if(invTab==='cables')out.push(quickAdd([['item','cable'],['qty','qty (default 1)']],o=>mergeAdd(D.inv.cables,o,false)),
+  D.inv.cables.length?editTable(D.inv.cables,[['item','item'],['qty','qty']],null,x=>{D.inv.cables=D.inv.cables.filter(y=>y!==x);save();render()}):h('div',{cls:'empty'},'nothing here yet.'));
+ else{const c=D.inv.custom.find(x=>x.id===invTab);out.push(...itemsSection(c.id,c.items),h('div',{style:'margin-top:20px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('delete the "'+c.name+'" sub-tab and its items?')){D.inv.custom=D.inv.custom.filter(y=>y!==c);invTab='clothes';save();render()}}}},'delete this sub-tab')))}
+ const nm=h('input',{placeholder:'new sub-tab name'}),add=()=>{const name=nm.value.trim();if(!name)return;const id=uid();D.inv.custom.push({id,name,items:[]});invTab=id;save();render()};nm.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ out.push(h('h2',{},'add a sub-tab'),h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},nm,h('button',{cls:'b',on:{click:add}},'add')),h('div',{cls:'empty',style:'margin-top:6px'},'new sub-tabs track item, category and quantity, like bathroom items.')));
  return out}
 
-function render(){const app=$('#app');let title,body;
+function render(){const app=$('#app');let title,body;const T=['media','todo','projects','habits','inventory'];if(!T.includes(tab)){if(tab==='books'||tab==='movies')mSub=tab;tab='media'}
  if(tab==='todo'){title='to-do';body=todoTab()}else if(tab==='projects'){title='day-projects';body=projectsTab()}
- else if(tab==='habits'){title='habit tracker';body=habitsTab()}else if(tab==='inventory'){title='inventory';body=inventoryTab()}
- else{if(tab!=='books'&&tab!=='movies')tab='books';title=tab;body=mediaTab(tab)}
- app.replaceChildren(h('h1',{},title),...body,h('div',{id:'status',style:'margin-top:24px'},syncMsg),
+ else if(tab==='habits'){title='habit tracker';body=habitsTab()}else if(tab==='inventory'){title='inventory';body=inventoryTab()}else{title='media';body=mediaPage()}
+ app.replaceChildren(h('h1',{},title),...body.filter(Boolean),h('div',{id:'status',style:'margin-top:24px'},syncMsg),
   h('div',{cls:'chips',style:'margin-top:10px'},h('button',{cls:'chip',on:{click:lockVault}},'lock'),h('button',{cls:'chip',on:{click:signOut}},'sign out')));
- const n=$('#nav');n.replaceChildren(...[['books','books'],['todo','to-do'],['movies','movies'],['projects','day-projects'],['habits','habits'],['inventory','inventory']].map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;render();scrollTo(0,0)}}},l)));
- const on=n.querySelector('.on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'center',block:'nearest'})}
+ const n=$('#nav');n.replaceChildren(...[['media','media'],['todo','to-do'],['projects','day-projects'],['habits','habits'],['inventory','inventory']].map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;render();scrollTo(0,0)}}},l)));
+ document.querySelectorAll('#app textarea').forEach(grow);const on=n.querySelector('.on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'center',block:'nearest'})}
 
 (async function boot(){
  try{
