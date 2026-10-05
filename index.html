@@ -41,7 +41,7 @@ button.b{background:var(--acc);color:var(--accT);border:0;font-weight:600;cursor
 input,select,textarea,button{text-transform:inherit}.keep,input.keep{text-transform:none}
 .cal button.sel{box-shadow:0 0 0 2px var(--ink)}.cal button.dot{text-decoration:underline}
 .months.single{grid-template-columns:minmax(0,380px);justify-content:center}
-.tbl{border-collapse:collapse;width:100%;min-width:540px}.tbl th{font-size:11px;text-align:left;color:var(--mut);padding:4px;font-weight:400}
+.tbl{border-collapse:collapse;width:100%;min-width:620px}.tbl th{font-size:11px;text-align:left;color:var(--mut);padding:4px;font-weight:400}
 .tbl td{padding:4px;border-top:1px solid var(--line);vertical-align:middle}
 .cell{width:100%;min-width:64px;padding:6px;border:1px solid transparent;background:transparent}.cell:focus{border-color:var(--line);background:var(--bg)}
 .thumb{width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:zoom-in;margin-right:3px;background:var(--line);vertical-align:middle}
@@ -166,7 +166,7 @@ const LISTS={books:{noun:'book',ph:'author',st:[['reading','reading'],['want','w
  movies:{noun:'movie',ph:'year (e.g. 1999)',st:[['watching','watching'],['want','want to watch'],['watched','watched']]},
  albums:{noun:'album',ph:'artist',st:[['listening','listening'],['want','want to listen'],['listened','listened']]}};
 const CATS=['bottoms','tops','outerwear','dresses'];
-let note='',openP=null,blOpen=false,dlOpen=false,mSub=null,hid=null,hsub=null,invTab=null,invAdding=false,catOpen={},invCat={},noteSel='new',noteEdit=false,draft={title:'',text:'',att:[]};
+let note='',openP=null,blOpen=false,dlOpen=false,mSub=null,hid=null,hsub=null,invTab=null,invAdding=false,impNote='',catOpen={},invCat={},noteSel='new',noteEdit=false,draft={title:'',text:'',att:[]};
 let hCal={y:new Date().getFullYear(),m:new Date().getMonth(),year:false,sel:null};
 const q=encodeURIComponent,pad=n=>String(n).padStart(2,'0'),ymd=(y,m,d)=>y+'-'+pad(m+1)+'-'+pad(d);
 
@@ -377,6 +377,37 @@ function habitsTab(){const n=h('input',{placeholder:'new habit (e.g. meditate)'}
   h('div',{style:'margin-top:24px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('delete "'+hb.name+'" and everything in it?')){delFiles([...hb.notes.flatMap(x=>x.att||[]),...hb.daily.flatMap(x=>x.att||[])]);D.habits=D.habits.filter(y=>y!==hb);hid=null;save();render()}}}},'delete this habit')));
  return out}
 
+// ---- import clothes from a markdown file (obsidian tables) ----
+function parseClothesMd(text){const out=[];let cat=null,cols=null;
+ for(const raw of text.split(/\r?\n/)){const line=raw.trim();
+  const hm=line.match(/^#+\s*(.+?)\s*:?\s*$/);if(hm){const t=hm[1].toLowerCase();cat=CATS.find(c=>t.includes(c.replace(/s$/,'')))||null;cols=null;continue}
+  if(!line.startsWith('|'))continue;
+  const cells=line.replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+  if(cells.every(c=>!c||/^:?-{2,}:?$/.test(c)))continue;
+  if(!cols){cols=cells.map(c=>c.toLowerCase());continue}
+  if(!cat)continue;
+  const get=re=>{const i=cols.findIndex(c=>re.test(c));return i<0?'':(cells[i]||'').replace(/<br\s*\/?>/gi,' ').trim()};
+  let name=get(/^(item|name)/);if(!name)continue;
+  let price='';const pm=name.match(/^(.*?)\s+(\d+(?:\.\d+)?(?:\s*-{1,2}\s*\d+(?:\.\d+)?)?)$/);if(pm){name=pm[1];price=pm[2]}
+  const imgs=[];cols.forEach((c,i)=>{if(/pic|extra|image|photo/.test(c))for(const m of(cells[i]||'').matchAll(/!\[\[([^\]|]+)/g))imgs.push(m[1].trim())});
+  out.push({cat,name,price,size:get(/^size/),company:get(/compan|brand/),selling:/^y/i.test(get(/sell/))?'yes':'',imgs})}
+ return out}
+async function importClothes(files,status){
+ const md=files.find(f=>/\.(md|markdown|txt)$/i.test(f.name));if(!md){alert('please include the markdown (.md) file. you can select pictures along with it.');return}
+ const pics=new Map(files.filter(f=>f!==md).map(f=>[f.name.toLowerCase(),f]));
+ const rows=parseClothesMd(await md.text());if(!rows.length){alert('no clothes tables were found in that file.');return}
+ const key=v=>(v||'').trim().toLowerCase();let added=0,np=0,missing=0,skipped=0,i=0;
+ for(const r of rows){i++;status.textContent='importing '+i+'/'+rows.length+'…';
+  let it=D.inv.clothes.find(x=>x.cat===r.cat&&key(x.name)===key(r.name));
+  if(it&&it.imgs.length){skipped++;continue}
+  if(!it){it={id:uid(),cat:r.cat,name:r.name,price:r.price,size:r.size,company:r.company,selling:r.selling,imgs:[]};D.inv.clothes.push(it);added++}
+  for(const n of r.imgs){if(it.imgs.length>=3)break;const f=pics.get(n.toLowerCase());if(!f){missing++;continue}
+   try{it.imgs.push(await addFile(f));np++}catch(e){missing++}}
+  save()}
+ const pl=(n,w)=>n+' '+w+(n===1?'':'s');
+ impNote='imported '+pl(added,'item')+(np?' and '+pl(np,'picture'):'')+'.'+(missing?' '+pl(missing,'picture')+' weren’t included (not selected, or failed to upload).':'')+(skipped?' '+pl(skipped,'item')+' already here were skipped.':'');
+ render()}
+
 // ---- inventory ----
 function backlogSec(){const open=D.backlog.filter(x=>!x.done),inp=h('input',{placeholder:'something for down-time'});
  const add=()=>{const v=inp.value.trim();if(!v)return;D.backlog.push({id:uid(),text:v,added:today(),done:false});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
@@ -395,17 +426,17 @@ function quickAdd(fields,add){const ins=fields.map(([k,ph,list])=>{const i=h('in
  btn.addEventListener('click',go);ins.forEach(i=>i.addEventListener('keydown',e=>e.key==='Enter'&&go()));
  return h('div',{cls:'card',style:'margin-bottom:10px'},h('div',{cls:'frm'},...ins),btn)}
 function clothesCat(c){const items=D.inv.clothes.filter(x=>x.cat===c);
- const f={name:h('input',{placeholder:'item name'}),price:h('input',{placeholder:'price',inputmode:'decimal'}),size:h('input',{placeholder:'size'}),company:h('input',{placeholder:'company'})};
+ const f={name:h('input',{placeholder:'item name'}),price:h('input',{placeholder:'price',inputmode:'decimal'}),size:h('input',{placeholder:'size'}),company:h('input',{placeholder:'company'}),selling:h('input',{placeholder:'selling? (yes / blank)'})};
  const files=h('input',{type:'file',accept:'image/*',multiple:''}),btn=h('button',{cls:'b'},'add item');
  btn.addEventListener('click',async()=>{if(!f.name.value.trim())return;btn.disabled=true;btn.textContent='uploading…';
   try{const imgs=[];for(const file of[...files.files].slice(0,3))imgs.push(await addFile(file));
-   D.inv.clothes.push({id:uid(),cat:c,name:f.name.value.trim(),price:f.price.value.trim(),size:f.size.value.trim(),company:f.company.value.trim(),imgs});save()}
+   D.inv.clothes.push({id:uid(),cat:c,name:f.name.value.trim(),price:f.price.value.trim(),size:f.size.value.trim(),company:f.company.value.trim(),selling:f.selling.value.trim(),imgs});save()}
   catch(e){alert('upload failed: '+(e.message||e))}render()});
  const pics=x=>{const fi=h('input',{type:'file',accept:'image/*',style:'display:none',on:{change:async e=>{const file=e.target.files[0];if(!file)return;try{x.imgs.push(await addFile(file));save()}catch(err){alert('upload failed: '+(err.message||err))}render()}}});
   return h('div',{cls:'pics'},...x.imgs.map(m=>h('img',{cls:'thumb',src:m.thumb||'',alt:'',on:{click:()=>lightbox(m,()=>{x.imgs=x.imgs.filter(y=>y!==m);delFiles([m]);save();render()})}})),x.imgs.length<3?h('button',{cls:'chip',on:{click:()=>fi.click()}},'+'):null,fi)};
- const d=h('details',{},h('summary',{},c+' ('+items.length+')'),h('div',{cls:'card'},h('div',{cls:'frm'},f.name,f.price,f.size,f.company),
+ const d=h('details',{},h('summary',{},c+' ('+items.length+')'),h('div',{cls:'card'},h('div',{cls:'frm'},f.name,f.price,f.size,f.company,f.selling),
   h('div',{cls:'row',style:'align-items:center'},files,btn),h('div',{cls:'empty',style:'margin-bottom:8px'},'up to 3 pictures. tap one later to see it full size.'),
-  items.length?editTable(items,[['name','item'],['price','price'],['size','size'],['company','company']],pics,x=>{D.inv.clothes=D.inv.clothes.filter(y=>y!==x);delFiles(x.imgs);save();render()}):h('div',{cls:'empty'},'nothing here yet.')));
+  items.length?editTable(items,[['name','item'],['price','price'],['size','size'],['company','company'],['selling','selling?']],pics,x=>{D.inv.clothes=D.inv.clothes.filter(y=>y!==x);delFiles(x.imgs);save();render()}):h('div',{cls:'empty'},'nothing here yet.')));
  if(catOpen[c])d.setAttribute('open','');d.addEventListener('toggle',()=>{catOpen[c]=d.open});return d}
 function mergeAdd(list,o,byCat){const n=Math.max(1,parseInt(o.qty)||1),k=v=>(v||'').trim().toLowerCase();
  const ex=list.find(x=>k(x.item)===k(o.item)&&(!byCat||k(x.category)===k(o.category)));
@@ -426,7 +457,11 @@ function inventoryTab(){const tabs=[['clothes','clothes'],['bathroom','bathroom 
   row.append(nm,h('button',{cls:'chip',on:{click:add}},'add'));setTimeout(()=>nm.focus(),0)}
  else row.append(h('button',{cls:'chip','aria-label':'add a sub-tab',title:'add a sub-tab',on:{click:()=>{invAdding=true;render()}}},'+'));
  const out=[row];
- if(invTab==='clothes')CATS.forEach(c=>out.push(clothesCat(c)));
+ if(invTab==='clothes'){const st=h('span',{cls:'empty'},impNote);impNote='';
+  const btn=h('button',{cls:'chip',on:{click:()=>fi.click()}},'import from markdown');
+  const fi=h('input',{type:'file',multiple:'',accept:'.md,.markdown,.txt,text/markdown,image/*,.avif,.heic',style:'display:none',on:{change:async e=>{const fs=[...e.target.files];if(!fs.length)return;btn.disabled=true;
+   try{await importClothes(fs,st)}catch(x){alert('import failed: '+(x.message||x))}render()}}});
+  out.push(h('div',{cls:'row',style:'align-items:center;flex-wrap:wrap;margin:4px 0 10px'},btn,fi,st));CATS.forEach(c=>out.push(clothesCat(c)))}
  else if(invTab==='bathroom')out.push(...itemsSection('bathroom',D.inv.bathroom));
  else if(invTab==='cables')out.push(quickAdd([['item','cable'],['qty','qty (default 1)']],o=>mergeAdd(D.inv.cables,o,false)),
   D.inv.cables.length?editTable(D.inv.cables,[['item','item'],['qty','qty']],null,x=>{D.inv.cables=D.inv.cables.filter(y=>y!==x);save();render()}):h('div',{cls:'empty'},'nothing here yet.'));
