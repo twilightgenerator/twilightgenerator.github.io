@@ -45,9 +45,8 @@ const fmt=s=>new Date(s+'T12:00').toLocaleDateString(undefined,{weekday:'long',m
  
  
 // ======= CONFIG: paste your Supabase project values here =======
-const SUPABASE_URL='https://hfmtpfucdomjjhzmngrm.supabase.co';
-const SUPABASE_ANON_KEY='sb_publishable_IozUvWj9SaWSylV4qWsMEg_bcdyV5vb';   // the public "anon" key is safe here; row-level security protects the data
- 
+  const SUPABASE_URL='https://hfmtpfucdomjjhzmngrm.supabase.co';
+  const SUPABASE_ANON_KEY='sb_publishable_IozUvWj9SaWSylV4qWsMEg_bcdyV5vb';
 // ---------- crypto: one password -> two independent secrets ----------
 const enc=new TextEncoder(),dec=new TextDecoder();
 const b64=u=>btoa(String.fromCharCode(...u)),unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
