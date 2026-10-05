@@ -10,9 +10,9 @@
 :root[data-theme="dark"]{--bg:#0b100d;--card:#111915;--ink:#cdeedb;--mut:#7fa08c;--line:#223028;--acc:#4ade80;--accT:#06200f}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--mono);text-transform:lowercase}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--font);text-transform:lowercase}
 main{max-width:640px;margin:0 auto;padding:16px 16px 90px}
-h1{font:600 20px/1.2 var(--mono);margin:4px 0 12px}h1::before{content:'> ';color:var(--acc)}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:22px 0 8px}
+h1{font:600 20px/1.2 var(--font);margin:4px 0 12px}h1::before{content:'> ';color:var(--acc)}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:22px 0 8px}
 nav{overflow-x:auto;position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 nav button{flex:1 0 auto;padding:14px 16px;white-space:nowrap;border:0;background:none;color:var(--mut);font:inherit;font-weight:600}
 nav button.on{color:var(--acc)}
@@ -57,6 +57,8 @@ audio{height:34px;max-width:230px}.links a{display:block;color:var(--acc);font-s
 details.card summary{outline:none}
 .item.sel{background:var(--bg)}.cell[type=number]{max-width:84px}
 textarea{overflow-y:hidden;resize:none}
+:root{--font:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif}
+.cal button{touch-action:manipulation}
 </style></head><body>
 <div id="lock" style="padding:20px">Loading Lifelog…</div>
 <main id="app" hidden></main>
@@ -145,7 +147,7 @@ async function signOut(){clearInterval(poll);key=null;D=emptyD();try{await sb.au
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
 
 // ---------- UI ----------
-function emptyD(){return{v:4,books:[],movies:[],albums:[],days:{},projects:[],habits:[],daily:[],backlog:[],inv:{clothes:[],bathroom:[],cables:[],custom:[]}}}
+function emptyD(){return{v:5,books:[],movies:[],albums:[],days:{},projects:[],habits:[],daily:[],backlog:[],inv:{clothes:[],bathroom:[],cables:[],custom:[]}}}
 function loadD(o){const ver=(o&&o.v)||0,d=Object.assign(emptyD(),o);d.inv=Object.assign({clothes:[],bathroom:[],cables:[],custom:[]},d.inv);
  d.habits.forEach(x=>{x.done=x.done||{};x.desc=x.desc||{};x.notes=x.notes||[];x.daily=x.daily||[];x.daily.forEach(t=>{t.done=!!t.done;t.att=t.att||[]});x.notes.forEach(n=>{n.att=n.att||[];n.title=n.title||''})});
  [d.inv.bathroom,d.inv.cables,...d.inv.custom.map(c=>c.items)].forEach(l=>l.forEach(x=>{if(x.qty==null)x.qty=1}));
@@ -156,13 +158,15 @@ function loadD(o){const ver=(o&&o.v)||0,d=Object.assign(emptyD(),o);d.inv=Object
   d.daily.forEach(t=>{if(t.until&&t.until===shift(t.from,1))delete t.until});
   for(const k of Object.keys(d.days).sort()){const dy=d.days[k];(dy.dd||[]).forEach(id=>{const t=d.daily.find(x=>x.id===id);if(t&&!t.doneOn)t.doneOn=k});delete dy.dd}
   d.v=4}
+ if(ver<5){d.daily.forEach(t=>{if(t.doneOn){const dy=d.days[t.doneOn]=d.days[t.doneOn]||{tasks:[]};(dy.dd=dy.dd||[]).push(t.id);delete t.doneOn}});d.v=5}
+ Object.values(d.days).forEach(dy=>{dy.dd=dy.dd||[]});
  return d}
-const DAY=()=>D.days[day]||(D.days[day]={tasks:[]});
+const DAY=()=>D.days[day]||(D.days[day]={tasks:[],dd:[]});
 const LISTS={books:{noun:'book',ph:'author',st:[['reading','reading'],['want','want to read'],['read','read']]},
  movies:{noun:'movie',ph:'year (e.g. 1999)',st:[['watching','watching'],['want','want to watch'],['watched','watched']]},
  albums:{noun:'album',ph:'artist',st:[['listening','listening'],['want','want to listen'],['listened','listened']]}};
 const CATS=['bottoms','tops','outerwear','dresses'];
-let note='',openP=null,blOpen=false,dlOpen=false,mSub='books',hid=null,hsub='calendar',invTab='clothes',catOpen={},invCat={},noteSel='new',noteEdit=false,draft={title:'',text:'',att:[]};
+let note='',openP=null,blOpen=false,dlOpen=false,mSub=null,hid=null,hsub=null,invTab=null,invAdding=false,catOpen={},invCat={},noteSel='new',noteEdit=false,draft={title:'',text:'',att:[]};
 let hCal={y:new Date().getFullYear(),m:new Date().getMonth(),year:false,sel:null};
 const q=encodeURIComponent,pad=n=>String(n).padStart(2,'0'),ymd=(y,m,d)=>y+'-'+pad(m+1)+'-'+pad(d);
 
@@ -259,7 +263,7 @@ function mediaTab(k){const c=LISTS[k],mv=k==='movies',n=note;note='';
  const out=[h('div',{cls:'card'},h('div',{cls:'row'},t),h('div',{cls:'row'},a),h('div',{cls:'row',style:'margin:0'},s,btn),n?h('div',{cls:'empty'},n):null)];
  for(const[v,l]of c.st){const items=D[k].filter(x=>x.st===v);
   out.push(h('h2',{},l+' ('+items.length+')'),h('div',{cls:'card'},items.length?items.map(x=>{
-   const sub=(x.by||x.year)?h('small',{},x.by?h('span',{cls:mv?'keep':''},x.by):null,x.by&&x.year?' · ':null,x.year?String(x.year):null):null;
+   const sub=(x.by||x.year)?h('small',{},x.by?h('span',{cls:k==='albums'?'':'keep'},x.by):null,x.by&&x.year?' · ':null,x.year?String(x.year):null):null;
    const rf=h('button',{cls:'x','aria-label':'fetch details',title:'fetch details',on:{click:async()=>{rf.textContent='…';
     try{const i=await look(k,x.title,mv?x.year:x.by);if(i){x.img=x.img||i.img;x.by=x.by||i.by;x.year=x.year||i.year;save()}}catch(e){}render()}}},'↻');
    return h('div',{cls:'item'},x.img?h('img',{cls:'cover',src:x.img,alt:'',loading:'lazy',on:{error:e=>{e.target.style.visibility='hidden'}}}):null,
@@ -268,7 +272,7 @@ function mediaTab(k){const c=LISTS[k],mv=k==='movies',n=note;note='';
     h('button',{cls:'x','aria-label':'delete',on:{click:()=>{D[k]=D[k].filter(y=>y!==x);save();render()}}},'×'))}):h('div',{cls:'empty'},'nothing here yet.')))}
  out.push(h('div',{cls:'empty',style:'margin-top:16px'},{movies:'movie info comes from wikipedia, wikidata and itunes (or omdb if you add a key). the title you type is sent there to look it up.',books:'book info and covers come from open library. the title you type is sent there to look it up.',albums:'album info comes from musicbrainz and the cover art archive. the title you type is sent there to look it up.'}[k]));
  return out}
-const mediaPage=()=>[chipRow([['books','books'],['movies','movies'],['albums','albums']],mSub,k=>{mSub=k;render()}),...mediaTab(mSub)];
+const mediaPage=()=>[chipRow([['books','books'],['movies','movies'],['albums','albums']],mSub,k=>{mSub=k;render()}),...(mSub?mediaTab(mSub):[])];
 
 // ---- to-do ----
 function taskList(list,ph){const inp=h('input',{placeholder:ph});
@@ -278,14 +282,14 @@ function taskList(list,ph){const inp=h('input',{placeholder:ph});
   h('input',{type:'checkbox',checked:x.done,on:{change:e=>{x.done=e.target.checked;save();render()}}}),h('div',{cls:'t'},x.text),
   h('button',{cls:'x','aria-label':'delete',on:{click:()=>{list.splice(list.indexOf(x),1);save();render()}}},'×'))):h('div',{cls:'empty'},'nothing yet.'),
   h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add')))}
-function dailySec(){const vis=D.daily.filter(t=>t.from<=day&&(!t.until||day<t.until)&&(!t.doneOn||day<t.doneOn)),inp=h('input',{placeholder:'add a daily task'});
+function dailySec(){const vis=D.daily.filter(t=>t.from<=day&&(!t.until||day<t.until)),dy=DAY();dy.dd=dy.dd||[];const dd=dy.dd,inp=h('input',{placeholder:'add a daily task'});
  const add=()=>{const v=inp.value.trim();if(!v)return;D.daily.push({id:uid(),text:v,from:day});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
- const d=h('details',{},h('summary',{},'daily tasks ('+vis.length+')'),h('div',{cls:'card'},vis.length?vis.map(t=>h('div',{cls:'item'},
-  h('input',{type:'checkbox',on:{change:()=>{t.doneOn=day;save();render()}}}),h('div',{cls:'t'},t.text,h('small',{},'since '+t.from)),
-  h('button',{cls:'x','aria-label':'remove from today onward',on:{click:()=>{if(t.from>=day)D.daily=D.daily.filter(y=>y!==t);else t.until=day;save();render()}}},'×'))):h('div',{cls:'empty'},'nothing for this day. tasks you add stay on every day until you tick them.'),
+ const d=h('details',{},h('summary',{},'daily tasks ('+vis.length+')'),h('div',{cls:'card'},vis.length?vis.map(t=>{const on=dd.includes(t.id);return h('div',{cls:'item'+(on?' done':'')},
+  h('input',{type:'checkbox',checked:on,on:{change:e=>{const i=dd.indexOf(t.id);if(e.target.checked&&i<0)dd.push(t.id);if(!e.target.checked&&i>=0)dd.splice(i,1);save();render()}}}),h('div',{cls:'t'},t.text,h('small',{},'since '+t.from)),
+  h('button',{cls:'x','aria-label':'stop this task from today onward',on:{click:()=>{if(t.from>=day)D.daily=D.daily.filter(y=>y!==t);else t.until=day;save();render()}}},'×'))}):h('div',{cls:'empty'},'nothing for this day. daily tasks repeat every day until you press ×.'),
   h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add'))));
  if(dlOpen)d.setAttribute('open','');d.addEventListener('toggle',()=>{dlOpen=d.open});return d}
-function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].tasks.length).sort().reverse();
+function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].tasks.length||D.days[k].dd.length).sort().reverse();
  const dp=h('input',{type:'date',value:day,on:{change:e=>{if(e.target.value){day=e.target.value;render()}}}});
  return[h('div',{cls:'date'},h('button',{cls:'b',on:{click:()=>{day=shift(day,-1);render()}}},'‹'),h('div',{style:'text-align:center'},h('strong',{},fmt(day)),h('div',{},dp)),h('button',{cls:'b',on:{click:()=>{day=shift(day,1);render()}}},'›')),
   day!==today()?h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{day=today();render()}}},'jump to today')):null,
@@ -295,37 +299,34 @@ function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].ta
   h('div',{style:'margin-top:18px'},backlogSec())]}
 
 // ---- day-projects ----
+const pDone=p=>p.todos.length>0&&p.todos.every(t=>t.done);
 function projectsTab(){const p=openP&&D.projects.find(x=>x.id===openP);
  if(p)return[h('button',{cls:'chip',on:{click:()=>{openP=null;render()}}},'‹ all projects'),
   h('h2',{},'title'),h('input',{value:p.title,placeholder:'title',style:'width:100%;font-weight:700',on:{input:e=>{p.title=e.target.value;save()}}}),
   h('h2',{},'description'),h('textarea',{rows:'4',placeholder:'what is this project about?',value:p.desc||'',on:{input:e=>{p.desc=e.target.value;save()}}}),
   h('h2',{},'to-do'),taskList(p.todos,'add a to-do item'),
-  h('div',{cls:'chips',style:'margin-top:20px'},h('button',{cls:'chip'+(p.done?' on':''),on:{click:()=>{p.done=!p.done;save();openP=null;render()}}},p.done?'completed ✓ (tap to reopen)':'mark completed'),
-   h('button',{cls:'chip',on:{click:()=>{if(confirm('delete this project?')){D.projects=D.projects.filter(x=>x!==p);openP=null;save();render()}}}},'delete project'))];
+  h('div',{cls:'empty',style:'margin-top:8px'},pDone(p)?'every item is done, so this project is under completed.':'this moves to completed once every item is ticked.'),
+  h('div',{style:'margin-top:20px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('delete this project?')){D.projects=D.projects.filter(x=>x!==p);openP=null;save();render()}}}},'delete project'))];
  openP=null;const n=h('input',{placeholder:'new project title'});
- const add=()=>{const title=n.value.trim();if(!title)return;const np={id:uid(),title,desc:'',todos:[],done:false};D.projects.unshift(np);openP=np.id;save();render()};n.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ const add=()=>{const title=n.value.trim();if(!title)return;const np={id:uid(),title,desc:'',todos:[]};D.projects.unshift(np);openP=np.id;save();render()};n.addEventListener('keydown',e=>e.key==='Enter'&&add());
  const list=(arr,empty)=>h('div',{cls:'card'},arr.length?arr.map(x=>h('div',{cls:'item'},
-  h('input',{type:'checkbox',checked:x.done,'aria-label':'completed',on:{change:e=>{x.done=e.target.checked;save();render()}}}),
-  h('div',{cls:'t proj',on:{click:()=>{openP=x.id;render()}}},x.title||'untitled'),h('small',{style:'color:var(--mut)'},x.todos.filter(t=>!t.done).length+' open'))):h('div',{cls:'empty'},empty));
- const w=D.projects.filter(x=>!x.done),c=D.projects.filter(x=>x.done);
+  h('div',{cls:'t proj',on:{click:()=>{openP=x.id;render()}}},x.title||'untitled'),h('small',{style:'color:var(--mut)'},x.todos.filter(t=>t.done).length+'/'+x.todos.length+' done'))):h('div',{cls:'empty'},empty));
+ const w=D.projects.filter(x=>!pDone(x)),c=D.projects.filter(pDone);
  return[h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},n,h('button',{cls:'b',on:{click:add}},'add'))),
   h('h2',{},'working ('+w.length+')'),list(w,'no projects in progress.'),h('h2',{},'completed ('+c.length+')'),list(c,'nothing completed yet.')]}
 
 // ---- habits ----
 const mname=(y,m)=>new Date(y,m,1).toLocaleDateString(undefined,{month:'long'});
-function habitCal(hb){const td=today(),cells={},cnt=h('div',{cls:'empty',style:'text-align:center;margin:6px 0'}),panel=h('div',{cls:'card',style:'margin:8px 0'}),entries=h('div',{cls:'card'});
+function habitCal(hb){const td=today(),cells={},cnt=h('div',{cls:'empty',style:'text-align:center;margin:6px 0'}),panel=h('div',{cls:'card',style:'margin:8px 0'});let last={k:null,t:0};
  const pre=()=>hCal.year?hCal.y+'-':hCal.y+'-'+pad(hCal.m+1)+'-';
  const paint=()=>{for(const[k,b]of Object.entries(cells))b.className=(hb.done[k]?'on ':'')+(hb.desc[k]?'dot ':'')+(k===td?'today ':'')+(k===hCal.sel?'sel':'')};
- const drawEntries=()=>{const ks=Object.keys(hb.done).filter(k=>k.startsWith(pre())).sort();
-  entries.replaceChildren(...(ks.length?ks.map(k=>h('div',{cls:'item'+(k===hCal.sel?' sel':'')},
-   h('div',{cls:'t',style:'cursor:pointer',on:{click:()=>{hCal.sel=k;paint();draw();drawEntries()}}},k,hb.desc[k]?h('small',{},hb.desc[k]):null),
-   h('button',{cls:'x','aria-label':'delete this day',on:{click:()=>del(k)}},'×'))):[h('div',{cls:'empty'},'no days marked here yet.')]))};
- const upd=()=>{const c=Object.keys(hb.done).filter(k=>k.startsWith(pre())).length;cnt.textContent=c+' day'+(c===1?'':'s')+' in '+(hCal.year?hCal.y:mname(hCal.y,hCal.m)+' '+hCal.y);drawEntries()};
- const draw=()=>{panel.replaceChildren();const k=hCal.sel;if(!k){panel.append(h('div',{cls:'empty'},'tap a date to mark it, then write what you did. tap a marked date again to delete it.'));return}
+ const upd=()=>{const c=Object.keys(hb.done).filter(k=>k.startsWith(pre())).length;cnt.textContent=c+' day'+(c===1?'':'s')+' in '+(hCal.year?hCal.y:mname(hCal.y,hCal.m)+' '+hCal.y)};
+ const draw=()=>{panel.replaceChildren();const k=hCal.sel;if(!k){panel.append(h('div',{cls:'empty'},'tap a date to mark it and open its note. double-tap a date to delete it.'));return}
   panel.append(h('div',{cls:'row',style:'justify-content:space-between;align-items:center'},h('strong',{},fmt(k)),h('button',{cls:'chip',on:{click:()=>del(k)}},'delete day')),
-   h('textarea',{rows:'3',placeholder:'what did you do?',value:hb.desc[k]||'',on:{input:e=>{const v=e.target.value;if(v.trim())hb.desc[k]=v;else delete hb.desc[k];save();paint();drawEntries()}}}));panel.querySelectorAll('textarea').forEach(grow)};
+   h('textarea',{rows:'3',placeholder:'what did you do?',value:hb.desc[k]||'',on:{input:e=>{const v=e.target.value;if(v.trim())hb.desc[k]=v;else delete hb.desc[k];save();paint()}}}));panel.querySelectorAll('textarea').forEach(grow)};
  const del=k=>{if(hb.desc[k]&&!confirm('delete this day and its note?'))return;delete hb.done[k];delete hb.desc[k];if(hCal.sel===k)hCal.sel=null;save();paint();draw();upd()};
- const pick=k=>{if(hb.done[k])return del(k);hb.done[k]=1;hCal.sel=k;save();paint();draw();upd()};
+ const pick=k=>{const now=Date.now();if(last.k===k&&now-last.t<400){last={k:null,t:0};if(hb.done[k])del(k);return}
+  last={k,t:now};if(!hb.done[k]){hb.done[k]=1;save()}hCal.sel=k;paint();draw();upd()};
  const month=(y,m)=>{const first=new Date(y,m,1).getDay(),nd=new Date(y,m+1,0).getDate(),cal=h('div',{cls:'cal'},['s','m','t','w','t','f','s'].map(w=>h('span',{},w)));
   for(let i=0;i<first;i++)cal.append(h('i'));
   for(let d=1;d<=nd;d++){const k=ymd(y,m,d),b=h('button',{'aria-label':k,on:{click:()=>pick(k)}},String(d));cells[k]=b;cal.append(b)}
@@ -335,7 +336,7 @@ function habitCal(hb){const td=today(),cells={},cnt=h('div',{cls:'empty',style:'
  if(hCal.year)for(let m=0;m<12;m++)grid.append(month(hCal.y,m));else grid.append(month(hCal.y,hCal.m));
  paint();draw();upd();
  return[h('div',{cls:'date'},h('button',{cls:'b',on:{click:()=>go(-1)}},'‹'),h('strong',{},hCal.year?String(hCal.y):mname(hCal.y,hCal.m)+' '+hCal.y),h('button',{cls:'b',on:{click:()=>go(1)}},'›')),
-  h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{hCal.year=!hCal.year;render()}}},hCal.year?'month view':'year view')),cnt,panel,grid,h('h2',{},'marked days'),entries]}
+  h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{hCal.year=!hCal.year;render()}}},hCal.year?'month view':'year view')),cnt,panel,grid]}
 const noteLabel=n=>(n.title||(n.text||'').trim().slice(0,22)||'untitled')+' · '+n.at;
 const enterDo=fn=>e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();fn()}};
 const linksOf=n=>h('div',{cls:'links'},...(String(n.text||'').match(/https?:\/\/[^\s]+/g)||[]).map(u=>h('a',{href:u,target:'_blank',rel:'noopener noreferrer'},u)));
@@ -365,14 +366,14 @@ function habitDaily(hb){const inp=h('input',{placeholder:'add a daily item'});
    h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add')))]}
 function habitsTab(){const n=h('input',{placeholder:'new habit (e.g. meditate)'});
  const reset=()=>{noteSel='new';noteEdit=false;hCal.sel=null};
- const add=()=>{const name=n.value.trim();if(!name)return;const id=uid();D.habits.push({id,name,done:{},desc:{},notes:[],daily:[]});hid=id;hsub='calendar';reset();
+ const add=()=>{const name=n.value.trim();if(!name)return;const id=uid();D.habits.push({id,name,done:{},desc:{},notes:[],daily:[]});hid=id;hsub=null;reset();
   hCal={y:new Date().getFullYear(),m:new Date().getMonth(),year:false,sel:null};save();render()};n.addEventListener('keydown',e=>e.key==='Enter'&&add());
  const out=[h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},n,h('button',{cls:'b',on:{click:add}},'add habit'))),
-  chipRow(D.habits.map(x=>[x.id,x.name]),hid,k=>{hid=k;hsub='calendar';reset();render()})];
+  chipRow(D.habits.map(x=>[x.id,x.name]),hid,k=>{hid=k;hsub=null;reset();render()})];
  const hb=D.habits.find(x=>x.id===hid);
  if(!hb){hid=null;out.push(h('div',{cls:'empty'},D.habits.length?'pick a habit above.':'add your first habit above.'));return out}
  out.push(h('h2',{},hb.name),chipRow([['calendar','calendar'],['notes','notes'],['daily','daily']],hsub,k=>{hsub=k;render()}),
-  ...(hsub==='calendar'?habitCal(hb):hsub==='notes'?habitNotes(hb):habitDaily(hb)),
+  ...(hsub==='calendar'?habitCal(hb):hsub==='notes'?habitNotes(hb):hsub==='daily'?habitDaily(hb):[]),
   h('div',{style:'margin-top:24px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('delete "'+hb.name+'" and everything in it?')){delFiles([...hb.notes.flatMap(x=>x.att||[]),...hb.daily.flatMap(x=>x.att||[])]);D.habits=D.habits.filter(y=>y!==hb);hid=null;save();render()}}}},'delete this habit')));
  return out}
 
@@ -410,29 +411,34 @@ function mergeAdd(list,o,byCat){const n=Math.max(1,parseInt(o.qty)||1),k=v=>(v||
  const ex=list.find(x=>k(x.item)===k(o.item)&&(!byCat||k(x.category)===k(o.category)));
  if(ex)ex.qty=(Number(ex.qty)||0)+n;else{const it={id:uid(),item:o.item,qty:n};if(byCat)it.category=o.category||'';list.push(it)}}
 function itemsSection(key,list){const cats=[...new Set(list.map(x=>x.category).filter(Boolean))].sort(),lid='cats-'+key;
- if(invCat[key]&&invCat[key]!=='all'&&!cats.includes(invCat[key]))invCat[key]='all';const cur=invCat[key]||'all';
+ if(invCat[key]&&invCat[key]!=='all'&&!cats.includes(invCat[key]))invCat[key]=null;const cur=cats.length?(invCat[key]||null):'all';
  const out=[h('datalist',{id:lid},cats.map(c=>h('option',{value:c}))),quickAdd([['item','item'],['category','category',lid],['qty','qty (default 1)']],o=>mergeAdd(list,o,true))];
  if(cats.length)out.push(chipRow([['all','all'],...cats.map(c=>[c,c])],cur,k=>{invCat[key]=k;render()}));
- const rows=cur==='all'?list:list.filter(x=>x.category===cur),del=x=>{const i=list.indexOf(x);if(i>=0)list.splice(i,1);save();render()};
- out.push(rows.length?editTable(rows,cur==='all'?[['item','item'],['category','category'],['qty','qty']]:[['item','item'],['qty','qty']],null,del):h('div',{cls:'empty'},'nothing here yet.'));
+ if(cur){const rows=cur==='all'?list:list.filter(x=>x.category===cur),del=x=>{const i=list.indexOf(x);if(i>=0)list.splice(i,1);save();render()};
+  out.push(rows.length?editTable(rows,cur==='all'?[['item','item'],['category','category'],['qty','qty']]:[['item','item'],['qty','qty']],null,del):h('div',{cls:'empty'},'nothing here yet.'))}
  return out}
 function inventoryTab(){const tabs=[['clothes','clothes'],['bathroom','bathroom items'],['cables','cables'],...D.inv.custom.map(c=>[c.id,c.name])];
- if(!tabs.some(t=>t[0]===invTab))invTab='clothes';const out=[chipRow(tabs,invTab,k=>{invTab=k;render()})];
+ if(invTab&&!tabs.some(t=>t[0]===invTab))invTab=null;
+ const row=chipRow(tabs,invTab,k=>{invTab=k;invAdding=false;render()});
+ if(invAdding){const nm=h('input',{placeholder:'sub-tab name',style:'padding:5px 10px;font-size:13px;width:150px'});
+  const add=()=>{const name=nm.value.trim();invAdding=false;if(name){const id=uid();D.inv.custom.push({id,name,items:[]});invTab=id;save()}render()};
+  nm.addEventListener('keydown',e=>{if(e.key==='Enter')add();if(e.key==='Escape'){invAdding=false;render()}});
+  row.append(nm,h('button',{cls:'chip',on:{click:add}},'add'));setTimeout(()=>nm.focus(),0)}
+ else row.append(h('button',{cls:'chip','aria-label':'add a sub-tab',title:'add a sub-tab',on:{click:()=>{invAdding=true;render()}}},'+'));
+ const out=[row];
  if(invTab==='clothes')CATS.forEach(c=>out.push(clothesCat(c)));
  else if(invTab==='bathroom')out.push(...itemsSection('bathroom',D.inv.bathroom));
  else if(invTab==='cables')out.push(quickAdd([['item','cable'],['qty','qty (default 1)']],o=>mergeAdd(D.inv.cables,o,false)),
   D.inv.cables.length?editTable(D.inv.cables,[['item','item'],['qty','qty']],null,x=>{D.inv.cables=D.inv.cables.filter(y=>y!==x);save();render()}):h('div',{cls:'empty'},'nothing here yet.'));
- else{const c=D.inv.custom.find(x=>x.id===invTab);out.push(...itemsSection(c.id,c.items),h('div',{style:'margin-top:20px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('delete the "'+c.name+'" sub-tab and its items?')){D.inv.custom=D.inv.custom.filter(y=>y!==c);invTab='clothes';save();render()}}}},'delete this sub-tab')))}
- const nm=h('input',{placeholder:'new sub-tab name'}),add=()=>{const name=nm.value.trim();if(!name)return;const id=uid();D.inv.custom.push({id,name,items:[]});invTab=id;save();render()};nm.addEventListener('keydown',e=>e.key==='Enter'&&add());
- out.push(h('h2',{},'add a sub-tab'),h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},nm,h('button',{cls:'b',on:{click:add}},'add')),h('div',{cls:'empty',style:'margin-top:6px'},'new sub-tabs track item, category and quantity, like bathroom items.')));
+ else if(invTab){const c=D.inv.custom.find(x=>x.id===invTab);out.push(...itemsSection(c.id,c.items),h('div',{style:'margin-top:20px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('delete the "'+c.name+'" sub-tab and its items?')){D.inv.custom=D.inv.custom.filter(y=>y!==c);invTab=null;save();render()}}}},'delete this sub-tab')))}
  return out}
 
-function render(){const app=$('#app');let title,body;const T=['media','todo','projects','habits','inventory'];if(!T.includes(tab)){if(tab==='books'||tab==='movies')mSub=tab;tab='media'}
+function render(){const app=$('#app');let title,body;const T=['media','todo','projects','habits','inventory'];if(!T.includes(tab))tab='media';
  if(tab==='todo'){title='to-do';body=todoTab()}else if(tab==='projects'){title='day-projects';body=projectsTab()}
  else if(tab==='habits'){title='habit tracker';body=habitsTab()}else if(tab==='inventory'){title='inventory';body=inventoryTab()}else{title='media';body=mediaPage()}
  app.replaceChildren(h('h1',{},title),...body.filter(Boolean),h('div',{id:'status',style:'margin-top:24px'},syncMsg),
   h('div',{cls:'chips',style:'margin-top:10px'},h('button',{cls:'chip',on:{click:lockVault}},'lock'),h('button',{cls:'chip',on:{click:signOut}},'sign out')));
- const n=$('#nav');n.replaceChildren(...[['media','media'],['todo','to-do'],['projects','day-projects'],['habits','habits'],['inventory','inventory']].map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;render();scrollTo(0,0)}}},l)));
+ const n=$('#nav');n.replaceChildren(...[['media','media'],['todo','to-do'],['projects','day-projects'],['habits','habits'],['inventory','inventory']].map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;mSub=null;invTab=null;invCat={};invAdding=false;hid=null;hsub=null;openP=null;render();scrollTo(0,0)}}},l)));
  document.querySelectorAll('#app textarea').forEach(grow);const on=n.querySelector('.on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'center',block:'nearest'})}
 
 (async function boot(){
