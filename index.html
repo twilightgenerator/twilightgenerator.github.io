@@ -2,8 +2,8 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lifelog</title>
-<script>window.addEventListener("error",function(e){var l=document.getElementById("lock");if(l&&!l.textContent.trim()){l.style.padding="20px";l.textContent="Startup error: "+e.message}});window.addEventListener("unhandledrejection",function(e){var l=document.getElementById("lock");if(l&&!l.textContent.trim()){l.style.padding="20px";l.textContent="Startup error: "+((e.reason&&e.reason.message)||e.reason)}})</script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>window.addEventListener("error",function(e){var l=document.getElementById("lock");if(l&&l.textContent.indexOf("Loading")===0){l.style.padding="20px";l.textContent="Startup error: "+e.message}});window.addEventListener("unhandledrejection",function(e){var l=document.getElementById("lock");if(l&&l.textContent.indexOf("Loading")===0){l.style.padding="20px";l.textContent="Startup error: "+((e.reason&&e.reason.message)||e.reason)}})</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <style>
 :root{--bg:#faf8f4;--card:#fff;--ink:#222;--mut:#777;--line:#e6e1d8;--acc:#3b6e5a;--accT:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171a19;--card:#212524;--ink:#eee;--mut:#9aa;--line:#333a38;--acc:#6fb59a;--accT:#10201a}}
@@ -31,7 +31,7 @@ button.b{background:var(--acc);color:var(--accT);border:0;font-weight:600;cursor
 #lock{max-width:380px;margin:12vh auto;padding:0 20px}#lock p{color:var(--mut);font-size:14px}#lock input{width:100%;margin:6px 0}#lock a{color:var(--acc);cursor:pointer;font-size:14px}
 #status{font-size:12px;color:var(--mut);text-align:right}.err{color:#c0392b;font-size:14px}
 </style></head><body>
-<div id="lock"></div>
+<div id="lock" style="padding:20px">Loading Lifelog…</div>
 <main id="app" hidden></main>
 <nav id="nav" hidden></nav>
 <script>
@@ -42,12 +42,12 @@ const uid=()=>Math.random().toString(36).slice(2,10);
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const shift=(s,n)=>{const d=new Date(s+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 const fmt=s=>new Date(s+'T12:00').toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric'});
-
-
+ 
+ 
 // ======= CONFIG: paste your Supabase project values here =======
-const SUPABASE_URL='hfmtpfucdomjjhzmngrm';
+const SUPABASE_URL='https://hfmtpfucdomjjhzmngrm.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_IozUvWj9SaWSylV4qWsMEg_bcdyV5vb';   // the public "anon" key is safe here; row-level security protects the data
-
+ 
 // ---------- crypto: one password -> two independent secrets ----------
 const enc=new TextEncoder(),dec=new TextDecoder();
 const b64=u=>btoa(String.fromCharCode(...u)),unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
@@ -60,7 +60,7 @@ async function seal(obj){const iv=crypto.getRandomValues(new Uint8Array(12));
  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(obj))));return b64(iv)+'.'+b64(ct)}
 async function open(blob){const[i,c]=blob.split('.').map(unb64);
  return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:i},key,c)))}
-
+ 
 // ---------- state & sync ----------
 let sb,user=null,key=null,D={books:[],movies:[],days:{}},tab='books',day=today(),lastBlob='',dirty=false,timer=null,poll=null,syncMsg='';
 const LS=()=>'lifelog.cache.'+(user&&user.id);
@@ -73,7 +73,7 @@ async function flush(){try{const blob=await seal(D);lastBlob=blob;try{localStora
  await push(blob);dirty=false;setStatus('Encrypted & synced')}catch(e){setStatus('Saved on this device — will sync when online')}}
 async function refresh(){if(!key||timer)return;if(dirty)return flush();
  try{const b=await pull();if(b&&b!==lastBlob){D=Object.assign({books:[],movies:[],days:{}},await open(b));lastBlob=b;try{localStorage.setItem(LS(),b)}catch(e){}render();setStatus('Updated from another device')}}catch(e){}}
-
+ 
 // ---------- auth screens ----------
 function authScreen(mode,msg){
  const L=$('#lock');L.hidden=false;L.replaceChildren();$('#app').hidden=true;$('#nav').hidden=true;
@@ -95,7 +95,7 @@ function authScreen(mode,msg){
  L.append(h('h1',{},'Lifelog'),h('p',{},up?'Your password also encrypts your data on this device before it’s uploaded, so it can’t be reset: if you forget it, your data can’t be recovered.':'Sign in to open your encrypted vault.'),
   em,p1,up?p2:null,err,h('div',{style:'margin:10px 0'},btn),
   h('a',{on:{click:()=>authScreen(up?'in':'up')}},up?'I already have an account':'Create an account'))}
-
+ 
 function unlockScreen(){
  const L=$('#lock');L.hidden=false;L.replaceChildren();$('#app').hidden=true;$('#nav').hidden=true;
  const p=h('input',{type:'password',placeholder:'Password',autocomplete:'current-password'}),err=h('div',{cls:'err'});
@@ -103,7 +103,7 @@ function unlockScreen(){
   try{key=(await derive(user.email,p.value)).key;await openVault()}catch(e){key=null;err.textContent='Wrong password.';btn.disabled=false;btn.textContent='Unlock'}};
  const btn=h('button',{cls:'b',on:{click:go}},'Unlock');p.addEventListener('keydown',e=>e.key==='Enter'&&go());
  L.append(h('h1',{},'Lifelog'),h('p',{},'Signed in as '+user.email+'. Enter your password to decrypt your data.'),p,err,h('div',{style:'margin:10px 0'},btn),h('a',{on:{click:signOut}},'Sign out'))}
-
+ 
 async function openVault(){
  let blob=null;try{blob=await pull()}catch(e){try{blob=localStorage.getItem(LS())}catch(_){}}
  if(blob){D=Object.assign({books:[],movies:[],days:{}},await open(blob));lastBlob=blob}   // throws if wrong password
@@ -113,12 +113,12 @@ async function openVault(){
 function lockVault(){key=null;D={books:[],movies:[],days:{}};clearInterval(poll);unlockScreen()}
 async function signOut(){clearInterval(poll);key=null;D={books:[],movies:[],days:{}};try{await sb.auth.signOut()}catch(e){}user=null;authScreen('in')}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
-
+ 
 // ---------- UI ----------
 const DAY=()=>D.days[day]||(D.days[day]={tasks:[],daily:[]});
 const LISTS={books:{noun:'Book',by:'Author',st:[['reading','Reading'],['want','Want to read'],['read','Read']]},
  movies:{noun:'Movie',by:'Director / year',st:[['watching','Watching'],['want','Want to watch'],['watched','Watched']]}};
-
+ 
 function mediaTab(k){const c=LISTS[k],arr=D[k];
  const t=h('input',{placeholder:c.noun+' title'}),a=h('input',{placeholder:c.by}),s=h('select',{},c.st.map(([v,l])=>h('option',{value:v},l)));
  s.value=c.st[1][0];
@@ -131,7 +131,7 @@ function mediaTab(k){const c=LISTS[k],arr=D[k];
     h('select',{on:{change:e=>{x.st=e.target.value;save();render()}}},c.st.map(([v2,l2])=>{const o=h('option',{value:v2},l2);if(v2===x.st)o.selected=true;return o})),
     h('button',{cls:'x','aria-label':'Delete',on:{click:()=>{D[k]=D[k].filter(y=>y!==x);save();render()}}},'×'))):h('div',{cls:'empty'},'Nothing here yet.')))}
  return out}
-
+ 
 function taskList(list,ph){const inp=h('input',{placeholder:ph});
  const add=()=>{if(!inp.value.trim())return;list.push({id:uid(),text:inp.value.trim(),done:false});save();render()};
  inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
@@ -139,7 +139,7 @@ function taskList(list,ph){const inp=h('input',{placeholder:ph});
   h('input',{type:'checkbox',checked:x.done,on:{change:e=>{x.done=e.target.checked;save();render()}}}),h('div',{cls:'t'},x.text),
   h('button',{cls:'x','aria-label':'Delete',on:{click:()=>{list.splice(list.indexOf(x),1);save();render()}}},'×'))):h('div',{cls:'empty'},'Nothing yet.'),
   h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'Add')))}
-
+ 
 function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].tasks.length+D.days[k].daily.length).sort().reverse();
  const dp=h('input',{type:'date',value:day,on:{change:e=>{if(e.target.value){day=e.target.value;render()}}}});
  return[h('div',{cls:'date'},h('button',{cls:'b',on:{click:()=>{day=shift(day,-1);render()}}},'‹'),h('div',{style:'text-align:center'},h('strong',{},fmt(day)),h('div',{},dp)),h('button',{cls:'b',on:{click:()=>{day=shift(day,1);render()}}},'›')),
@@ -147,12 +147,12 @@ function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].ta
   h('h2',{},'To-do'),taskList(d.tasks,'Add a task for this day'),
   h('h2',{},'Daily tasks (this day only)'),taskList(d.daily,'Add a daily task'),
   h('h2',{},'Past entries'),h('div',{cls:'chips'},past.length?past.map(k=>h('button',{cls:'chip'+(k===day?' on':''),on:{click:()=>{day=k;render()}}},k)):h('span',{cls:'empty'},'Entries you add will be listed here.'))]}
-
+ 
 function render(){const app=$('#app');
  const body=tab==='todo'?todoTab():mediaTab(tab);
  app.replaceChildren(h('h1',{},{books:'Books',todo:'To-do',movies:'Movies'}[tab]),...body,h('div',{id:'status',style:'margin-top:24px'},syncMsg),h('div',{cls:'chips',style:'margin-top:10px'},h('button',{cls:'chip',on:{click:lockVault}},'Lock'),h('button',{cls:'chip',on:{click:signOut}},'Sign out')));
  const n=$('#nav');n.replaceChildren(...[['books','Books'],['todo','To-do'],['movies','Movies']].map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;render();scrollTo(0,0)}}},l)))}
-
+ 
 (async function boot(){
  try{
   if(SUPABASE_URL.startsWith('YOUR_')){authScreen('in');return}
