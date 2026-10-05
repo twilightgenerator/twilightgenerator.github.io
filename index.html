@@ -94,17 +94,27 @@ async function open(blob){const[i,c]=blob.split('.').map(unb64);
  return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:i},key,c)))}
 
 // ---------- state & sync ----------
-let sb,user=null,key=null,D=emptyD(),tab='books',day=today(),lastBlob='',dirty=false,timer=null,poll=null,syncMsg='';
+let sb,user=null,key=null,D=emptyD(),tab='books',day=today(),lastBlob='',lastAt=null,dirty=false,timer=null,poll=null,syncMsg='',showVer=false;
 const LS=()=>'lifelog.cache.'+(user&&user.id);
-function setStatus(m){syncMsg=m;const e=$('#status');if(e)e.textContent=m}
-async function pull(){const{data,error}=await sb.from('vaults').select('blob').eq('user_id',user.id).maybeSingle();
- if(error)throw error;return data?data.blob:null}
-async function push(blob){const{error}=await sb.from('vaults').upsert({user_id:user.id,blob,updated_at:new Date().toISOString()});if(error)throw error}
-function save(){dirty=true;clearTimeout(timer);setStatus('Saving…');timer=setTimeout(flush,700)}
-async function flush(){try{const blob=await seal(D);lastBlob=blob;try{localStorage.setItem(LS(),blob)}catch(e){}
- await push(blob);dirty=false;setStatus('Encrypted & synced')}catch(e){setStatus('Saved on this device — will sync when online')}}
-async function refresh(){if(!key||timer)return;if(dirty)return flush();
- try{const b=await pull();if(b&&b!==lastBlob){D=loadD(await open(b));lastBlob=b;try{localStorage.setItem(LS(),b)}catch(e){}render();setStatus('Updated from another device')}}catch(e){}}
+function readLocal(){try{const v=localStorage.getItem(LS());if(!v)return null;if(v[0]==='{'){const o=JSON.parse(v);return{b:o.b,s:!!o.s}}return{b:v,s:false}}catch(e){return null}}
+function writeLocal(b,s){try{localStorage.setItem(LS(),JSON.stringify({b,s:s?1:0}))}catch(e){}}
+const errText=e=>(e&&(e.message||e.code))||String(e);
+function setStatus(m){syncMsg=m;const e=$('#status');if(e){e.textContent=m;e.style.color=m.startsWith('⚠')?'#e5484d':''}}
+async function pullRow(){const{data,error}=await sb.from('vaults').select('blob,updated_at').eq('user_id',user.id).maybeSingle();if(error)throw error;return data}
+async function backup(blob){try{const{error}=await sb.from('vault_history').insert({user_id:user.id,blob});return!error}catch(e){return false}}
+function save(){dirty=true;clearTimeout(timer);setStatus('saving…');timer=setTimeout(flush,700)}
+async function flush(){timer=null;let blob;
+ try{blob=await seal(D);lastBlob=blob;writeLocal(blob,false)}catch(e){setStatus('⚠ could not save: '+errText(e));return}
+ try{const r=await pullRow();
+  if(r&&lastAt&&Date.parse(r.updated_at)!==Date.parse(lastAt)&&r.blob!==blob){
+   await backup(blob);D=loadD(await open(r.blob));lastBlob=r.blob;lastAt=r.updated_at;writeLocal(r.blob,true);dirty=false;render();
+   setStatus('⚠ another device saved newer changes, so they were loaded here. your last change on this device was kept as a backup under "versions".');return}
+  const{data,error}=await sb.from('vaults').upsert({user_id:user.id,blob,updated_at:new Date().toISOString()}).select('updated_at').single();if(error)throw error;
+  lastAt=data.updated_at;writeLocal(blob,true);dirty=false;setStatus('encrypted & synced')}
+ catch(e){setStatus('⚠ not synced, saved on this device only ('+errText(e)+')')}}
+async function refresh(){if(!key||timer)return;const l=readLocal();if(dirty||(l&&!l.s))return flush();
+ try{const r=await pullRow();if(r&&r.blob!==lastBlob){D=loadD(await open(r.blob));lastBlob=r.blob;lastAt=r.updated_at;writeLocal(r.blob,true);render();setStatus('updated from another device')}}
+ catch(e){setStatus('⚠ not syncing ('+errText(e)+')')}}
 
 // ---------- auth screens ----------
 function authScreen(mode,msg){
@@ -137,11 +147,27 @@ function unlockScreen(){
  L.append(h('h1',{},'Lifelog'),h('p',{},'Signed in as '+user.email+'. Enter your password to decrypt your data.'),p,err,h('div',{style:'margin:10px 0'},btn),h('a',{on:{click:signOut}},'Sign out'))}
 
 async function openVault(){
- let blob=null;try{blob=await pull()}catch(e){try{blob=localStorage.getItem(LS())}catch(_){}}
- if(blob){D=loadD(await open(blob));lastBlob=blob}   // throws if wrong password
- else{D=emptyD();save()}
- $('#lock').hidden=true;$('#app').hidden=false;$('#nav').hidden=false;render();setStatus('Encrypted & synced');
+ let row=null,err=null;try{row=await pullRow()}catch(e){err=e}
+ const loc=readLocal(),R=row&&row.blob,L=loc&&loc.b;let pick=null;
+ if(R&&L&&!loc.s&&L!==R){const dr=await open(R),dl=await open(L);   // open() throws on a wrong password
+  if(JSON.stringify(dl).length>JSON.stringify(dr).length){pick={b:L,o:dl,local:1};await backup(R)}else{pick={b:R,o:dr};await backup(L)}}
+ else if(R)pick={b:R,o:await open(R)};
+ else if(L)pick={b:L,o:await open(L),local:1};
+ if(pick){D=loadD(pick.o);lastBlob=pick.b}else D=emptyD();
+ if(row)lastAt=row.updated_at;
+ $('#lock').hidden=true;$('#app').hidden=false;$('#nav').hidden=false;render();
+ if(err)setStatus('⚠ not syncing, saved on this device only ('+errText(err)+')');
+ else if(!pick||pick.local)save();
+ else{writeLocal(pick.b,true);setStatus('encrypted & synced')}
  clearInterval(poll);poll=setInterval(refresh,20000)}
+async function versionsPanel(el){el.replaceChildren(h('div',{cls:'empty'},'loading backups…'));
+ const{data,error}=await sb.from('vault_history').select('id,saved_at').eq('user_id',user.id).order('id',{ascending:false}).limit(50);
+ if(error){el.replaceChildren(h('div',{cls:'err'},'backups unavailable ('+errText(error)+'). run supabase-fix.sql.'));return}
+ el.replaceChildren(h('div',{cls:'empty',style:'margin-bottom:6px'},'earlier versions, newest first. restoring keeps what you have now as a version too.'),
+  ...(data.length?data.map(v=>{const b=h('button',{cls:'chip',on:{click:async()=>{if(!confirm('replace everything with this version?'))return;b.textContent='restoring…';
+   try{const{data:r,error:e}=await sb.from('vault_history').select('blob').eq('id',v.id).single();if(e)throw e;const o=await open(r.blob);await backup(await seal(D));D=loadD(o);showVer=false;save();render()}
+   catch(x){alert('restore failed: '+errText(x));b.textContent='restore'}}}},'restore');
+   return h('div',{cls:'item'},h('div',{cls:'t'},new Date(v.saved_at).toLocaleString()),b)}):[h('div',{cls:'empty'},'no backups yet. one is kept automatically at most every 10 minutes while you make changes.')]))}
 function lockVault(){key=null;D=emptyD();clearInterval(poll);unlockScreen()}
 async function signOut(){clearInterval(poll);key=null;D=emptyD();try{await sb.auth.signOut()}catch(e){}user=null;authScreen('in')}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
@@ -166,7 +192,7 @@ const LISTS={books:{noun:'book',ph:'author',st:[['reading','reading'],['want','w
  movies:{noun:'movie',ph:'year (e.g. 1999)',st:[['watching','watching'],['want','want to watch'],['watched','watched']]},
  albums:{noun:'album',ph:'artist',st:[['listening','listening'],['want','want to listen'],['listened','listened']]}};
 const CATS=['bottoms','tops','outerwear','dresses'];
-let note='',openP=null,blOpen=false,dlOpen=false,mSub=null,hid=null,hsub=null,invTab=null,invAdding=false,impNote='',catOpen={},invCat={},noteSel='new',noteEdit=false,draft={title:'',text:'',att:[]};
+let note='',openP=null,blOpen=false,dlOpen=false,mSub=null,hid=null,hsub=null,invTab=null,invAdding=false,impNote='',impMissing=[],catOpen={},invCat={},noteSel='new',noteEdit=false,draft={title:'',text:'',att:[]};
 let hCal={y:new Date().getFullYear(),m:new Date().getMonth(),year:false,sel:null};
 const q=encodeURIComponent,pad=n=>String(n).padStart(2,'0'),ymd=(y,m,d)=>y+'-'+pad(m+1)+'-'+pad(d);
 
@@ -392,20 +418,28 @@ function parseClothesMd(text){const out=[];let cat=null,cols=null;
   const imgs=[];cols.forEach((c,i)=>{if(/pic|extra|image|photo/.test(c))for(const m of(cells[i]||'').matchAll(/!\[\[([^\]|]+)/g))imgs.push(m[1].trim())});
   out.push({cat,name,price,size:get(/^size/),company:get(/compan|brand/),selling:/^y/i.test(get(/sell/))?'yes':'',imgs})}
  return out}
+const nameKey=n=>String(n).split(/[\\/]/).pop().normalize('NFC').toLowerCase().trim();
 async function importClothes(files,status){
  const md=files.find(f=>/\.(md|markdown|txt)$/i.test(f.name));if(!md){alert('please include the markdown (.md) file. you can select pictures along with it.');return}
- const pics=new Map(files.filter(f=>f!==md).map(f=>[f.name.toLowerCase(),f]));
  const rows=parseClothesMd(await md.text());if(!rows.length){alert('no clothes tables were found in that file.');return}
- const key=v=>(v||'').trim().toLowerCase();let added=0,np=0,missing=0,skipped=0,i=0;
- for(const r of rows){i++;status.textContent='importing '+i+'/'+rows.length+'…';
-  let it=D.inv.clothes.find(x=>x.cat===r.cat&&key(x.name)===key(r.name));
-  if(it&&it.imgs.length){skipped++;continue}
-  if(!it){it={id:uid(),cat:r.cat,name:r.name,price:r.price,size:r.size,company:r.company,selling:r.selling,imgs:[]};D.inv.clothes.push(it);added++}
-  for(const n of r.imgs){if(it.imgs.length>=3)break;const f=pics.get(n.toLowerCase());if(!f){missing++;continue}
-   try{it.imgs.push(await addFile(f));np++}catch(e){missing++}}
-  save()}
+ const key=v=>(v||'').trim().toLowerCase();let added=0,existing=0;const want=[];
+ for(const r of rows){let it=D.inv.clothes.find(x=>x.cat===r.cat&&key(x.name)===key(r.name));
+  if(it)existing++;else{it={id:uid(),cat:r.cat,name:r.name,price:r.price,size:r.size,company:r.company,selling:r.selling,imgs:[]};D.inv.clothes.push(it);added++}
+  const have=new Set(it.imgs.map(m=>nameKey(m.name)));
+  for(const n of r.imgs)if(!have.has(nameKey(n)))want.push({id:it.id,item:it.name,n})}
+ save();
  const pl=(n,w)=>n+' '+w+(n===1?'':'s');
- impNote='imported '+pl(added,'item')+(np?' and '+pl(np,'picture'):'')+'.'+(missing?' '+pl(missing,'picture')+' weren’t included (not selected, or failed to upload).':'')+(skipped?' '+pl(skipped,'item')+' already here were skipped.':'');
+ await attachPics(want,files.filter(f=>f!==md),status,'imported '+pl(added,'item')+(existing?' ('+existing+' already here)':'')+'. ')}
+async function attachPics(want,files,status,prefix){
+ const map=new Map();for(const f of files){const k=nameKey(f.name);if(!map.has(k))map.set(k,f)}
+ const pl=(n,w)=>n+' '+w+(n===1?'':'s');let np=0,i=0;const miss=[],failed=[];
+ for(const w of want){i++;const it=D.inv.clothes.find(x=>x.id===w.id);if(!it||it.imgs.length>=3)continue;
+  if(it.imgs.some(m=>nameKey(m.name)===nameKey(w.n)))continue;
+  const f=map.get(nameKey(w.n));if(!f){miss.push(w);continue}
+  status.textContent='uploading picture '+i+'/'+want.length+'…';
+  try{it.imgs.push(await addFile(f));np++;save()}catch(e){failed.push(Object.assign({},w,{err:e.message||String(e)}))}}
+ impMissing=[...miss,...failed];
+ impNote=(prefix||'')+pl(np,'picture')+' added.'+(miss.length?' '+pl(miss.length,'picture')+' not found in what you selected.':'')+(failed.length?' '+failed.length+' failed to upload ('+failed[0].err+').':'');
  render()}
 
 // ---- inventory ----
@@ -461,7 +495,15 @@ function inventoryTab(){const tabs=[['clothes','clothes'],['bathroom','bathroom 
   const btn=h('button',{cls:'chip',on:{click:()=>fi.click()}},'import from markdown');
   const fi=h('input',{type:'file',multiple:'',accept:'.md,.markdown,.txt,text/markdown,image/*,.avif,.heic',style:'display:none',on:{change:async e=>{const fs=[...e.target.files];if(!fs.length)return;btn.disabled=true;
    try{await importClothes(fs,st)}catch(x){alert('import failed: '+(x.message||x))}render()}}});
-  out.push(h('div',{cls:'row',style:'align-items:center;flex-wrap:wrap;margin:4px 0 10px'},btn,fi,st));CATS.forEach(c=>out.push(clothesCat(c)))}
+  out.push(h('div',{cls:'row',style:'align-items:center;flex-wrap:wrap;margin:4px 0 10px'},btn,fi,st));
+  if(impMissing.length){const fb=h('button',{cls:'b'},'look for them in a folder…');
+   const fd=h('input',{type:'file',webkitdirectory:'',multiple:'',style:'display:none',on:{change:async e=>{const fs=[...e.target.files];if(!fs.length)return;fb.disabled=true;fb.textContent='searching…';
+    try{await attachPics(impMissing.map(w=>({id:w.id,item:w.item,n:w.n})),fs,st,'')}catch(x){alert('failed: '+(x.message||x));render()}}}});
+   fb.addEventListener('click',()=>fd.click());
+   out.push(h('details',{cls:'card',style:'margin-bottom:12px'},h('summary',{},'pictures still missing ('+impMissing.length+')'),
+    h('div',{cls:'empty',style:'margin:4px 0 8px'},'pick a folder (your whole obsidian vault works) and every subfolder is searched for these files.'),fb,fd,
+    h('div',{style:'margin-top:10px;font-size:13px;max-height:260px;overflow:auto'},impMissing.map(w=>h('div',{style:'padding:3px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere'},h('span',{cls:'keep'},w.n),h('small',{style:'color:var(--mut)'},' — '+w.item+(w.err?' (upload failed: '+w.err+')':'')))))))}
+  CATS.forEach(c=>out.push(clothesCat(c)))}
  else if(invTab==='bathroom')out.push(...itemsSection('bathroom',D.inv.bathroom));
  else if(invTab==='cables')out.push(quickAdd([['item','cable'],['qty','qty (default 1)']],o=>mergeAdd(D.inv.cables,o,false)),
   D.inv.cables.length?editTable(D.inv.cables,[['item','item'],['qty','qty']],null,x=>{D.inv.cables=D.inv.cables.filter(y=>y!==x);save();render()}):h('div',{cls:'empty'},'nothing here yet.'));
@@ -471,8 +513,9 @@ function inventoryTab(){const tabs=[['clothes','clothes'],['bathroom','bathroom 
 function render(){const app=$('#app');let title,body;const T=['media','todo','projects','habits','inventory'];if(!T.includes(tab))tab='media';
  if(tab==='todo'){title='to-do';body=todoTab()}else if(tab==='projects'){title='day-projects';body=projectsTab()}
  else if(tab==='habits'){title='habit tracker';body=habitsTab()}else if(tab==='inventory'){title='inventory';body=inventoryTab()}else{title='media';body=mediaPage()}
- app.replaceChildren(h('h1',{},title),...body.filter(Boolean),h('div',{id:'status',style:'margin-top:24px'},syncMsg),
-  h('div',{cls:'chips',style:'margin-top:10px'},h('button',{cls:'chip',on:{click:lockVault}},'lock'),h('button',{cls:'chip',on:{click:signOut}},'sign out')));
+ app.replaceChildren(h('h1',{},title),...body.filter(Boolean),h('div',{id:'status',style:'margin-top:24px'+(syncMsg.startsWith('⚠')?';color:#e5484d':'')},syncMsg),
+  h('div',{cls:'chips',style:'margin-top:10px'},h('button',{cls:'chip',on:{click:lockVault}},'lock'),h('button',{cls:'chip',on:{click:signOut}},'sign out'),h('button',{cls:'chip'+(showVer?' on':''),on:{click:()=>{showVer=!showVer;render()}}},'versions')),
+  ...(showVer?[(()=>{const vp=h('div',{cls:'card',style:'margin-top:10px'});versionsPanel(vp);return vp})()]:[]));
  const n=$('#nav');n.replaceChildren(...[['media','media'],['todo','to-do'],['projects','day-projects'],['habits','habits'],['inventory','inventory']].map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;mSub=null;invTab=null;invCat={};invAdding=false;hid=null;hsub=null;openP=null;render();scrollTo(0,0)}}},l)));
  document.querySelectorAll('#app textarea').forEach(grow);const on=n.querySelector('.on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'center',block:'nearest'})}
 
