@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lifelog</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#faf8f4;--card:#fff;--ink:#222;--mut:#777;--line:#e6e1d8;--acc:#3b6e5a;--accT:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171a19;--card:#212524;--ink:#eee;--mut:#9aa;--line:#333a38;--acc:#6fb59a;--accT:#10201a}}
+:root[data-theme="dark"]{--bg:#171a19;--card:#212524;--ink:#eee;--mut:#9aa;--line:#333a38;--acc:#6fb59a;--accT:#10201a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px 16px 90px}
+h1{font:600 22px Georgia,serif;margin:4px 0 12px}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:22px 0 8px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;padding:14px 0;border:0;background:none;color:var(--mut);font:inherit;font-weight:600}
+nav button.on{color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+input,select,button.b{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-width:0}
+button.b{background:var(--acc);color:var(--accT);border:0;font-weight:600;cursor:pointer}
+.row{display:flex;gap:8px;margin-bottom:8px}.row>input{flex:1}
+.item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border:0}.item .t{flex:1;min-width:0;overflow-wrap:anywhere}.item small{color:var(--mut);display:block}
+.item select{padding:5px;font-size:13px}.x{border:0;background:none;color:var(--mut);font-size:20px;cursor:pointer}
+.done .t{text-decoration:line-through;color:var(--mut)}
+.empty{color:var(--mut);font-size:14px;padding:6px 0}
+.date{display:flex;align-items:center;justify-content:space-between;gap:8px}.date button{padding:8px 14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:5px 11px;font-size:13px;cursor:pointer}
+.chip.on{background:var(--acc);color:var(--accT)}
+#lock{max-width:380px;margin:12vh auto;padding:0 20px}#lock p{color:var(--mut);font-size:14px}#lock input{width:100%;margin:6px 0}#lock a{color:var(--acc);cursor:pointer;font-size:14px}
+#status{font-size:12px;color:var(--mut);text-align:right}.err{color:#c0392b;font-size:14px}
+</style></head><body>
+<div id="lock"></div>
+<main id="app" hidden></main>
+<nav id="nav" hidden></nav>
+<script>
+const $=s=>document.querySelector(s);
+function h(tag,props,...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(props||{})){if(k==='on')for(const[ev,f]of Object.entries(v))e.addEventListener(ev,f);else if(k==='cls')e.className=v;else if(k==='value')e.value=v;else if(k==='checked')e.checked=v;else e.setAttribute(k,v)}
+for(const c of kids.flat())if(c!=null&&c!==false)e.append(c.nodeType?c:document.createTextNode(c));return e}
+const uid=()=>Math.random().toString(36).slice(2,10);
+const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const shift=(s,n)=>{const d=new Date(s+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const fmt=s=>new Date(s+'T12:00').toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric'});
+
+
+// ======= CONFIG: paste your Supabase project values here =======
+const SUPABASE_URL='hfmtpfucdomjjhzmngrm';
+const SUPABASE_ANON_KEY='sb_publishable_IozUvWj9SaWSylV4qWsMEg_bcdyV5vb';   // the public "anon" key is safe here; row-level security protects the data
+
+// ---------- crypto: one password -> two independent secrets ----------
+const enc=new TextEncoder(),dec=new TextDecoder();
+const b64=u=>btoa(String.fromCharCode(...u)),unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function pbkdf2(pw,saltStr){const k=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveBits']);
+ return new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode(saltStr),iterations:250000,hash:'SHA-256'},k,256))}
+async function derive(email,pw){const e=email.trim().toLowerCase();
+ const auth=await pbkdf2(pw,'lifelog-auth:'+e),k=await pbkdf2(pw,'lifelog-enc:'+e);
+ return{authPw:b64(auth),key:await crypto.subtle.importKey('raw',k,'AES-GCM',false,['encrypt','decrypt'])}}
+async function seal(obj){const iv=crypto.getRandomValues(new Uint8Array(12));
+ const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(obj))));return b64(iv)+'.'+b64(ct)}
+async function open(blob){const[i,c]=blob.split('.').map(unb64);
+ return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:i},key,c)))}
+
+// ---------- state & sync ----------
+let sb,user=null,key=null,D={books:[],movies:[],days:{}},tab='books',day=today(),lastBlob='',dirty=false,timer=null,poll=null,syncMsg='';
+const LS=()=>'lifelog.cache.'+(user&&user.id);
+function setStatus(m){syncMsg=m;const e=$('#status');if(e)e.textContent=m}
+async function pull(){const{data,error}=await sb.from('vaults').select('blob').eq('user_id',user.id).maybeSingle();
+ if(error)throw error;return data?data.blob:null}
+async function push(blob){const{error}=await sb.from('vaults').upsert({user_id:user.id,blob,updated_at:new Date().toISOString()});if(error)throw error}
+function save(){dirty=true;clearTimeout(timer);setStatus('Saving…');timer=setTimeout(flush,700)}
+async function flush(){try{const blob=await seal(D);lastBlob=blob;try{localStorage.setItem(LS(),blob)}catch(e){}
+ await push(blob);dirty=false;setStatus('Encrypted & synced')}catch(e){setStatus('Saved on this device — will sync when online')}}
+async function refresh(){if(!key||timer)return;if(dirty)return flush();
+ try{const b=await pull();if(b&&b!==lastBlob){D=Object.assign({books:[],movies:[],days:{}},await open(b));lastBlob=b;try{localStorage.setItem(LS(),b)}catch(e){}render();setStatus('Updated from another device')}}catch(e){}}
+
+// ---------- auth screens ----------
+function authScreen(mode,msg){
+ const L=$('#lock');L.hidden=false;L.replaceChildren();$('#app').hidden=true;$('#nav').hidden=true;
+ if(SUPABASE_URL.startsWith('YOUR_')){L.append(h('h1',{},'Lifelog'),h('p',{},'Setup needed: open this file and paste your Supabase URL and anon key at the top of the script.'));return}
+ const up=mode==='up',em=h('input',{type:'email',placeholder:'Email',autocomplete:'email'}),
+  p1=h('input',{type:'password',placeholder:'Password',autocomplete:up?'new-password':'current-password'}),
+  p2=h('input',{type:'password',placeholder:'Confirm password',autocomplete:'new-password'}),err=h('div',{cls:msg&&msg.ok?'':'err'},msg?msg.t:'');
+ const go=async()=>{err.className='err';err.textContent='';const email=em.value.trim();if(!email||!p1.value)return;
+  if(up){if(p1.value.length<10){err.textContent='Use at least 10 characters.';return}if(p1.value!==p2.value){err.textContent='Passwords don’t match.';return}}
+  btn.disabled=true;btn.textContent='Working…';
+  try{const d=await derive(email,p1.value);
+   const r=up?await sb.auth.signUp({email,password:d.authPw}):await sb.auth.signInWithPassword({email,password:d.authPw});
+   if(r.error)throw r.error;
+   if(!r.data.session){authScreen('in',{ok:1,t:'Account created. Check your email to confirm it, then sign in.'});return}
+   user=r.data.session.user;key=d.key;await openVault()}
+  catch(e){err.textContent=e.message||'Something went wrong.';btn.disabled=false;btn.textContent=up?'Create account':'Sign in'}};
+ const btn=h('button',{cls:'b',on:{click:go}},up?'Create account':'Sign in');
+ [em,p1,p2].forEach(i=>i.addEventListener('keydown',e=>e.key==='Enter'&&go()));
+ L.append(h('h1',{},'Lifelog'),h('p',{},up?'Your password also encrypts your data on this device before it’s uploaded, so it can’t be reset: if you forget it, your data can’t be recovered.':'Sign in to open your encrypted vault.'),
+  em,p1,up?p2:null,err,h('div',{style:'margin:10px 0'},btn),
+  h('a',{on:{click:()=>authScreen(up?'in':'up')}},up?'I already have an account':'Create an account'))}
+
+function unlockScreen(){
+ const L=$('#lock');L.hidden=false;L.replaceChildren();$('#app').hidden=true;$('#nav').hidden=true;
+ const p=h('input',{type:'password',placeholder:'Password',autocomplete:'current-password'}),err=h('div',{cls:'err'});
+ const go=async()=>{err.textContent='';if(!p.value)return;btn.disabled=true;btn.textContent='Unlocking…';
+  try{key=(await derive(user.email,p.value)).key;await openVault()}catch(e){key=null;err.textContent='Wrong password.';btn.disabled=false;btn.textContent='Unlock'}};
+ const btn=h('button',{cls:'b',on:{click:go}},'Unlock');p.addEventListener('keydown',e=>e.key==='Enter'&&go());
+ L.append(h('h1',{},'Lifelog'),h('p',{},'Signed in as '+user.email+'. Enter your password to decrypt your data.'),p,err,h('div',{style:'margin:10px 0'},btn),h('a',{on:{click:signOut}},'Sign out'))}
+
+async function openVault(){
+ let blob=null;try{blob=await pull()}catch(e){try{blob=localStorage.getItem(LS())}catch(_){}}
+ if(blob){D=Object.assign({books:[],movies:[],days:{}},await open(blob));lastBlob=blob}   // throws if wrong password
+ else{D={books:[],movies:[],days:{}};save()}
+ $('#lock').hidden=true;$('#app').hidden=false;$('#nav').hidden=false;render();setStatus('Encrypted & synced');
+ clearInterval(poll);poll=setInterval(refresh,20000)}
+function lockVault(){key=null;D={books:[],movies:[],days:{}};clearInterval(poll);unlockScreen()}
+async function signOut(){clearInterval(poll);key=null;D={books:[],movies:[],days:{}};try{await sb.auth.signOut()}catch(e){}user=null;authScreen('in')}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+
+// ---------- UI ----------
+const DAY=()=>D.days[day]||(D.days[day]={tasks:[],daily:[]});
+const LISTS={books:{noun:'Book',by:'Author',st:[['reading','Reading'],['want','Want to read'],['read','Read']]},
+ movies:{noun:'Movie',by:'Director / year',st:[['watching','Watching'],['want','Want to watch'],['watched','Watched']]}};
+
+function mediaTab(k){const c=LISTS[k],arr=D[k];
+ const t=h('input',{placeholder:c.noun+' title'}),a=h('input',{placeholder:c.by}),s=h('select',{},c.st.map(([v,l])=>h('option',{value:v},l)));
+ s.value=c.st[1][0];
+ const add=()=>{if(!t.value.trim())return;arr.unshift({id:uid(),title:t.value.trim(),by:a.value.trim(),st:s.value});save();render()};
+ t.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ const out=[h('div',{cls:'card'},h('div',{cls:'row'},t),h('div',{cls:'row'},a),h('div',{cls:'row'},s,h('button',{cls:'b',on:{click:add}},'Add')))];
+ for(const[v,l]of c.st){const items=arr.filter(x=>x.st===v);
+  out.push(h('h2',{},l+' ('+items.length+')'),h('div',{cls:'card'},items.length?items.map(x=>
+   h('div',{cls:'item'},h('div',{cls:'t'},x.title,x.by?h('small',{},x.by):null),
+    h('select',{on:{change:e=>{x.st=e.target.value;save();render()}}},c.st.map(([v2,l2])=>{const o=h('option',{value:v2},l2);if(v2===x.st)o.selected=true;return o})),
+    h('button',{cls:'x','aria-label':'Delete',on:{click:()=>{D[k]=D[k].filter(y=>y!==x);save();render()}}},'×'))):h('div',{cls:'empty'},'Nothing here yet.')))}
+ return out}
+
+function taskList(list,ph){const inp=h('input',{placeholder:ph});
+ const add=()=>{if(!inp.value.trim())return;list.push({id:uid(),text:inp.value.trim(),done:false});save();render()};
+ inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ return h('div',{cls:'card'},list.length?list.map(x=>h('div',{cls:'item'+(x.done?' done':'')},
+  h('input',{type:'checkbox',checked:x.done,on:{change:e=>{x.done=e.target.checked;save();render()}}}),h('div',{cls:'t'},x.text),
+  h('button',{cls:'x','aria-label':'Delete',on:{click:()=>{list.splice(list.indexOf(x),1);save();render()}}},'×'))):h('div',{cls:'empty'},'Nothing yet.'),
+  h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'Add')))}
+
+function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].tasks.length+D.days[k].daily.length).sort().reverse();
+ const dp=h('input',{type:'date',value:day,on:{change:e=>{if(e.target.value){day=e.target.value;render()}}}});
+ return[h('div',{cls:'date'},h('button',{cls:'b',on:{click:()=>{day=shift(day,-1);render()}}},'‹'),h('div',{style:'text-align:center'},h('strong',{},fmt(day)),h('div',{},dp)),h('button',{cls:'b',on:{click:()=>{day=shift(day,1);render()}}},'›')),
+  day!==today()?h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{day=today();render()}}},'Jump to today')):null,
+  h('h2',{},'To-do'),taskList(d.tasks,'Add a task for this day'),
+  h('h2',{},'Daily tasks (this day only)'),taskList(d.daily,'Add a daily task'),
+  h('h2',{},'Past entries'),h('div',{cls:'chips'},past.length?past.map(k=>h('button',{cls:'chip'+(k===day?' on':''),on:{click:()=>{day=k;render()}}},k)):h('span',{cls:'empty'},'Entries you add will be listed here.'))]}
+
+function render(){const app=$('#app');
+ const body=tab==='todo'?todoTab():mediaTab(tab);
+ app.replaceChildren(h('h1',{},{books:'Books',todo:'To-do',movies:'Movies'}[tab]),...body,h('div',{id:'status',style:'margin-top:24px'},syncMsg),h('div',{cls:'chips',style:'margin-top:10px'},h('button',{cls:'chip',on:{click:lockVault}},'Lock'),h('button',{cls:'chip',on:{click:signOut}},'Sign out')));
+ const n=$('#nav');n.replaceChildren(...[['books','Books'],['todo','To-do'],['movies','Movies']].map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;render();scrollTo(0,0)}}},l)))}
+
+(async function boot(){
+ if(SUPABASE_URL.startsWith('YOUR_')){authScreen('in');return}
+ sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+ const{data}=await sb.auth.getSession();
+ if(data.session){user=data.session.user;unlockScreen()}else authScreen('in')})();
+</script></body></html>
