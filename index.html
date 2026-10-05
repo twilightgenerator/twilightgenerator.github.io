@@ -5,14 +5,14 @@
 <script>window.addEventListener("error",function(e){var l=document.getElementById("lock");if(l&&l.textContent.indexOf("Loading")===0){l.style.padding="20px";l.textContent="Startup error: "+e.message}});window.addEventListener("unhandledrejection",function(e){var l=document.getElementById("lock");if(l&&l.textContent.indexOf("Loading")===0){l.style.padding="20px";l.textContent="Startup error: "+((e.reason&&e.reason.message)||e.reason)}})</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <style>
-:root{--bg:#faf8f4;--card:#fff;--ink:#222;--mut:#777;--line:#e6e1d8;--acc:#3b6e5a;--accT:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171a19;--card:#212524;--ink:#eee;--mut:#9aa;--line:#333a38;--acc:#6fb59a;--accT:#10201a}}
-:root[data-theme="dark"]{--bg:#171a19;--card:#212524;--ink:#eee;--mut:#9aa;--line:#333a38;--acc:#6fb59a;--accT:#10201a}
+:root{--bg:#faf8f4;--card:#fff;--ink:#222;--mut:#777;--line:#e6e1d8;--acc:#1f7a4d;--accT:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b100d;--card:#111915;--ink:#cdeedb;--mut:#7fa08c;--line:#223028;--acc:#4ade80;--accT:#06200f}}
+:root[data-theme="dark"]{--bg:#0b100d;--card:#111915;--ink:#cdeedb;--mut:#7fa08c;--line:#223028;--acc:#4ade80;--accT:#06200f}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--mono);text-transform:lowercase}
 main{max-width:640px;margin:0 auto;padding:16px 16px 90px}
-h1{font:600 22px Georgia,serif;margin:4px 0 12px}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:22px 0 8px}
+h1{font:600 20px/1.2 var(--mono);margin:4px 0 12px}h1::before{content:'> ';color:var(--acc)}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:22px 0 8px}
 nav{overflow-x:auto;position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 nav button{flex:1 0 auto;padding:14px 16px;white-space:nowrap;border:0;background:none;color:var(--mut);font:inherit;font-weight:600}
 nav button.on{color:var(--acc)}
@@ -36,6 +36,25 @@ button.b{background:var(--acc);color:var(--accT);border:0;font-weight:600;cursor
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.cal span{text-align:center;font-size:10px;color:var(--mut)}
 .cal button{aspect-ratio:1;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:5px;font-size:11px;padding:0;cursor:pointer}
 .cal button.on{background:#2e9e5b;border-color:#2e9e5b;color:#fff}.cal button.today{outline:2px solid var(--acc)}
+
+:root{--mono:ui-monospace,"SF Mono","JetBrains Mono","Fira Code",Menlo,Consolas,"Liberation Mono",monospace}
+input,select,textarea,button{text-transform:inherit}.keep,input.keep{text-transform:none}
+.cal button.sel{box-shadow:0 0 0 2px var(--ink)}.cal button.dot{text-decoration:underline}
+.months.single{grid-template-columns:minmax(0,380px);justify-content:center}
+.tbl{border-collapse:collapse;width:100%;min-width:540px}.tbl th{font-size:11px;text-align:left;color:var(--mut);padding:4px;font-weight:400}
+.tbl td{padding:4px;border-top:1px solid var(--line);vertical-align:middle}
+.cell{width:100%;min-width:64px;padding:6px;border:1px solid transparent;background:transparent}.cell:focus{border-color:var(--line);background:var(--bg)}
+.thumb{width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:zoom-in;margin-right:3px;background:var(--line);vertical-align:middle}
+.pics{display:flex;align-items:center;gap:2px;min-width:170px}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:8px}
+details>summary{cursor:pointer;font-weight:700;padding:8px 0;color:var(--acc)}details>.card{margin-bottom:8px}
+.atts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}.att{display:inline-flex;align-items:center;gap:2px}
+.pdf{width:84px;height:112px;border:1px solid var(--line);border-radius:6px;overflow:hidden;cursor:pointer;position:relative;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.pdf img{width:100%;height:100%;object-fit:cover;object-position:top}.pdf small{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);color:#fff;font-size:9px;padding:2px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+audio{height:34px;max-width:230px}.links a{display:block;color:var(--acc);font-size:13px;overflow-wrap:anywhere;margin-top:4px}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:flex;flex-direction:column;align-items:center;overflow:auto;padding:12px;gap:10px}
+.lb img{margin:auto;max-width:95vw;max-height:84vh;cursor:zoom-in}.lb img.full{max-width:none;max-height:none;cursor:zoom-out}.lbm{margin:auto;color:#fff}
+details.card summary{outline:none}
 </style></head><body>
 <div id="lock" style="padding:20px">Loading Lifelog…</div>
 <main id="app" hidden></main>
@@ -54,8 +73,8 @@ const fmt=s=>new Date(s+'T12:00').toLocaleDateString(undefined,{weekday:'long',m
 const SUPABASE_URL='https://hfmtpfucdomjjhzmngrm.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_IozUvWj9SaWSylV4qWsMEg_bcdyV5vb';   // the public "anon" key is safe here; row-level security protects the data
 
-// Optional: free TMDB API key (themoviedb.org > Settings > API) turns on movie director + poster lookup
-const TMDB_KEY='YOUR_TMDB_API_KEY';
+// Optional: free OMDb key (omdbapi.com, email only) for better movie matches. Leave blank to use Wikipedia/Wikidata, which needs no key.
+const OMDB_KEY='';
 
 // ---------- crypto: one password -> two independent secrets ----------
 const enc=new TextEncoder(),dec=new TextDecoder();
@@ -81,7 +100,7 @@ function save(){dirty=true;clearTimeout(timer);setStatus('Saving…');timer=setT
 async function flush(){try{const blob=await seal(D);lastBlob=blob;try{localStorage.setItem(LS(),blob)}catch(e){}
  await push(blob);dirty=false;setStatus('Encrypted & synced')}catch(e){setStatus('Saved on this device — will sync when online')}}
 async function refresh(){if(!key||timer)return;if(dirty)return flush();
- try{const b=await pull();if(b&&b!==lastBlob){D=Object.assign(emptyD(),await open(b));lastBlob=b;try{localStorage.setItem(LS(),b)}catch(e){}render();setStatus('Updated from another device')}}catch(e){}}
+ try{const b=await pull();if(b&&b!==lastBlob){D=loadD(await open(b));lastBlob=b;try{localStorage.setItem(LS(),b)}catch(e){}render();setStatus('Updated from another device')}}catch(e){}}
 
 // ---------- auth screens ----------
 function authScreen(mode,msg){
@@ -115,7 +134,7 @@ function unlockScreen(){
 
 async function openVault(){
  let blob=null;try{blob=await pull()}catch(e){try{blob=localStorage.getItem(LS())}catch(_){}}
- if(blob){D=Object.assign(emptyD(),await open(blob));lastBlob=blob}   // throws if wrong password
+ if(blob){D=loadD(await open(blob));lastBlob=blob}   // throws if wrong password
  else{D=emptyD();save()}
  $('#lock').hidden=true;$('#app').hidden=false;$('#nav').hidden=false;render();setStatus('Encrypted & synced');
  clearInterval(poll);poll=setInterval(refresh,20000)}
@@ -124,113 +143,227 @@ async function signOut(){clearInterval(poll);key=null;D=emptyD();try{await sb.au
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
 
 // ---------- UI ----------
-function emptyD(){return{books:[],movies:[],days:{},projects:[],habits:[]}}
-const DAY=()=>D.days[day]||(D.days[day]={tasks:[],daily:[]});
-const LISTS={books:{noun:'Book',st:[['reading','Reading'],['want','Want to read'],['read','Read']]},
- movies:{noun:'Movie',st:[['watching','Watching'],['want','Want to watch'],['watched','Watched']]}};
-let note='',openP=null,hy=new Date().getFullYear();const q=encodeURIComponent;
+function emptyD(){return{books:[],movies:[],days:{},projects:[],habits:[],daily:[],backlog:[],inv:{clothes:[],bathroom:[],cables:[]}}}
+function loadD(o){const d=Object.assign(emptyD(),o);d.inv=Object.assign({clothes:[],bathroom:[],cables:[]},d.inv);
+ d.habits.forEach(x=>{x.done=x.done||{};x.desc=x.desc||{};x.notes=x.notes||[];x.daily=x.daily||[];x.ticks=x.ticks||{}});
+ for(const k of Object.keys(d.days).sort()){const dy=d.days[k];dy.tasks=dy.tasks||[];dy.dd=dy.dd||[];
+  if(Array.isArray(dy.daily)){dy.daily.forEach(t=>{d.daily.push({id:t.id,text:t.text,from:k,until:shift(k,1)});if(t.done)dy.dd.push(t.id)});delete dy.daily}}
+ return d}
+const DAY=()=>D.days[day]||(D.days[day]={tasks:[],dd:[]});
+const LISTS={books:{noun:'book',st:[['reading','reading'],['want','want to read'],['read','read']]},
+ movies:{noun:'movie',st:[['watching','watching'],['want','want to watch'],['watched','watched']]}};
+const CATS=['bottoms','tops','outerwear','dresses'];
+let note='',openP=null,blOpen=false,hid=null,hsub='calendar',invTab='clothes',catOpen={};
+let hCal={y:new Date().getFullYear(),m:new Date().getMonth(),year:false,sel:null};
+const q=encodeURIComponent,pad=n=>String(n).padStart(2,'0'),ymd=(y,m,d)=>y+'-'+pad(m+1)+'-'+pad(d);
 
-async function jget(url,headers){const c=new AbortController(),t=setTimeout(()=>c.abort(),7000);
- try{const r=await fetch(url,{signal:c.signal,headers});if(!r.ok)throw new Error(r.status);return await r.json()}finally{clearTimeout(t)}}
-const tmdb=p=>{const long=TMDB_KEY.length>40;return jget('https://api.themoviedb.org/3'+p+(long?'':(p.includes('?')?'&':'?')+'api_key='+TMDB_KEY),long?{Authorization:'Bearer '+TMDB_KEY}:undefined)};
+// ---- lookups (no accounts needed) ----
+async function jget(url){const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);
+ try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error(r.status);return await r.json()}finally{clearTimeout(t)}}
 async function lookupMovie(title,year){
- if(TMDB_KEY.startsWith('YOUR_'))return{off:1};
- let r=(await tmdb('/search/movie?query='+q(title)+(year?'&year='+q(year):''))).results?.[0];
- if(!r&&year)r=(await tmdb('/search/movie?query='+q(title))).results?.[0];
- if(!r)return null;let by='';
- try{by=((await tmdb('/movie/'+r.id+'/credits')).crew||[]).filter(p=>p.job==='Director').map(p=>p.name).join(', ')}catch(e){}
- return{by,year:(r.release_date||'').slice(0,4),img:r.poster_path?'https://image.tmdb.org/t/p/w154'+r.poster_path:''}}
+ if(OMDB_KEY){try{const r=await jget('https://www.omdbapi.com/?apikey='+OMDB_KEY+'&t='+q(title)+(year?'&y='+q(year):''));
+  if(r.Response==='True')return{by:r.Director!=='N/A'?r.Director:'',year:(r.Year||'').slice(0,4),img:r.Poster&&r.Poster!=='N/A'?r.Poster:''}}catch(e){}}
+ const w=await jget('https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrlimit=1&gsrsearch='+q(title+(year?' '+year:'')+' film')+'&prop=pageimages|pageprops&piprop=thumbnail&pithumbsize=154&ppprop=wikibase_item');
+ const pg=Object.values((w.query&&w.query.pages)||{})[0];if(!pg)return null;
+ let by='';const id=pg.pageprops&&pg.pageprops.wikibase_item;
+ if(id){try{const e=await jget('https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&origin=*&props=claims&ids='+id);
+  const ids=((e.entities[id].claims||{}).P57||[]).map(c=>c.mainsnak.datavalue.value.id);
+  if(ids.length){const l=await jget('https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&origin=*&props=labels&languages=en&ids='+ids.join('|'));
+   by=ids.map(i=>l.entities[i].labels.en&&l.entities[i].labels.en.value).filter(Boolean).join(', ')}}catch(e){}}
+ return{by,year:((pg.title.match(/\((\d{4}) film\)/)||[])[1])||'',img:(pg.thumbnail&&pg.thumbnail.source)||''}}
 async function lookupBook(title,author){
- const d=(await jget('https://openlibrary.org/search.json?limit=1&fields=author_name,first_publish_year,cover_i&title='+q(title)+(author?'&author='+q(author):''))).docs?.[0];
- if(!d)return null;
- return{by:(d.author_name||[])[0]||'',year:d.first_publish_year||'',img:d.cover_i?'https://covers.openlibrary.org/b/id/'+d.cover_i+'-M.jpg':''}}
+ const d=(await jget('https://openlibrary.org/search.json?limit=1&fields=author_name,first_publish_year,cover_i&title='+q(title)+(author?'&author='+q(author):''))).docs[0];
+ if(!d)return null;return{by:(d.author_name||[])[0]||'',year:d.first_publish_year||'',img:d.cover_i?'https://covers.openlibrary.org/b/id/'+d.cover_i+'-M.jpg':''}}
 
+// ---- encrypted file storage (files are encrypted in the browser before upload) ----
+async function sealBytes(u8){const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,u8));
+ const o=new Uint8Array(12+ct.length);o.set(iv);o.set(ct,12);return o}
+async function openBytes(u8){return crypto.subtle.decrypt({name:'AES-GCM',iv:u8.slice(0,12)},key,u8.slice(12))}
+async function imgThumb(file,s){s=s||96;const bm=await createImageBitmap(file),c=document.createElement('canvas');c.width=c.height=s;
+ const r=Math.max(s/bm.width,s/bm.height),w=bm.width*r,hh=bm.height*r;c.getContext('2d').drawImage(bm,(s-w)/2,(s-hh)/2,w,hh);return c.toDataURL('image/jpeg',.6)}
+function loadPdfjs(){return window.pdfjsLib?Promise.resolve(window.pdfjsLib):new Promise((res,rej)=>{const sc=document.createElement('script');
+ sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';sc.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';res(window.pdfjsLib)};sc.onerror=rej;document.head.append(sc)})}
+async function pdfThumb(u8){const lib=await loadPdfjs(),doc=await lib.getDocument({data:u8.slice()}).promise,pg=await doc.getPage(1),v0=pg.getViewport({scale:1}),
+ vp=pg.getViewport({scale:168/v0.width}),c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+ await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;return c.toDataURL('image/jpeg',.6)}
+async function addFile(file){
+ if(file.size>45e6)throw new Error(file.name+' is over 45 MB');
+ const buf=new Uint8Array(await file.arrayBuffer()),isPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);
+ const m={id:uid(),name:file.name,type:isPdf?'application/pdf':(file.type||'application/octet-stream'),size:file.size,path:user.id+'/'+uid()+uid()};
+ if(isPdf)m.thumb=await pdfThumb(buf).catch(()=>'');else if(m.type.startsWith('image/'))m.thumb=await imgThumb(file).catch(()=>'');
+ const{error}=await sb.storage.from('files').upload(m.path,new Blob([await sealBytes(buf)]),{contentType:'application/octet-stream'});
+ if(error)throw error;return m}
+async function getFile(m){const{data,error}=await sb.storage.from('files').download(m.path);if(error)throw error;
+ return new Blob([await openBytes(new Uint8Array(await data.arrayBuffer()))],{type:m.type})}
+function delFiles(list){const p=(list||[]).map(m=>m.path).filter(Boolean);if(p.length)Promise.resolve(sb.storage.from('files').remove(p)).catch(()=>{})}
+async function openPdf(m){const w=window.open('','_blank');try{const u=URL.createObjectURL(await getFile(m));if(w)w.location.href=u;else location.href=u}catch(e){if(w)w.close();alert('could not open that file')}}
+function lightbox(m,onDel){const ov=h('div',{cls:'lb',on:{click:()=>ov.remove()}},h('div',{cls:'lbm'},'loading…'));document.body.append(ov);
+ getFile(m).then(b=>{const img=h('img',{src:URL.createObjectURL(b),alt:'',on:{click:e=>{e.stopPropagation();img.classList.toggle('full')}}});
+  ov.replaceChildren(img,h('div',{cls:'lbm',style:'font-size:12px;margin:0'},'tap picture for full size · tap outside to close'),onDel?h('button',{cls:'chip',on:{click:e=>{e.stopPropagation();if(confirm('delete this picture?')){ov.remove();onDel()}}}},'delete picture'):null)})
+ .catch(()=>ov.replaceChildren(h('div',{cls:'lbm'},'could not load image')))}
+function attView(m,owner){
+ const del=h('button',{cls:'x','aria-label':'remove',on:{click:()=>{if(!confirm('remove this file?'))return;owner.att=owner.att.filter(a=>a!==m);delFiles([m]);save();render()}}},'×');let el;
+ if(m.type.startsWith('audio/')){const b=h('button',{cls:'chip',on:{click:async()=>{b.textContent='loading…';try{const a=h('audio',{controls:'',src:URL.createObjectURL(await getFile(m))});b.replaceWith(a);a.play().catch(()=>{})}catch(e){b.textContent='could not load'}}}},'▶ '+m.name);el=b}
+ else if(m.type==='application/pdf')el=h('div',{cls:'pdf',title:m.name,on:{click:()=>openPdf(m)}},m.thumb?h('img',{src:m.thumb,alt:''}):h('span',{},'pdf'),h('small',{},m.name));
+ else if(m.type.startsWith('image/'))el=h('img',{cls:'thumb',src:m.thumb||'',alt:m.name,on:{click:()=>lightbox(m)}});
+ else el=h('a',{cls:'chip',href:'#',on:{click:async e=>{e.preventDefault();try{const a=document.createElement('a');a.href=URL.createObjectURL(await getFile(m));a.download=m.name;a.click()}catch(x){alert('could not load file')}}}},'[file] '+m.name);
+ return h('span',{cls:'att'},el,del)}
+function attachUI(owner){owner.att=owner.att||[];
+ const btn=h('button',{cls:'chip',on:{click:()=>fi.click()}},'+ attach file');
+ const fi=h('input',{type:'file',accept:'audio/*,application/pdf,.pdf,.doc,.docx,image/*',multiple:'',style:'display:none',on:{change:async e=>{const fs=[...e.target.files];if(!fs.length)return;btn.textContent='uploading…';
+  try{for(const f of fs)owner.att.push(await addFile(f));save()}catch(x){alert('upload failed: '+(x.message||x))}render()}}});
+ return h('div',{cls:'atts'},...owner.att.map(m=>attView(m,owner)),fi,btn)}
+const chipRow=(items,cur,pick)=>h('div',{cls:'chips',style:'margin:10px 0'},items.map(([k,l])=>h('button',{cls:'chip'+(k===cur?' on':''),on:{click:()=>pick(k)}},l)));
+
+// ---- books & movies ----
 function mediaTab(k){const c=LISTS[k],mv=k==='movies',n=note;note='';
- const t=h('input',{placeholder:c.noun+' title'}),a=h('input',{placeholder:mv?'Year (e.g. 1999)':'Author',inputmode:mv?'numeric':'text'}),
-  s=h('select',{},c.st.map(([v,l])=>h('option',{value:v},l)));s.value=c.st[1][0];
- const btn=h('button',{cls:'b'},'Add');
- const add=async()=>{const title=t.value.trim();if(!title)return;btn.disabled=true;btn.textContent='Looking up…';
-  const typed=a.value.trim();let info=null;
-  try{info=mv?await lookupMovie(title,typed):await lookupBook(title,typed)}catch(e){info=null}
+ const t=h('input',{cls:'keep',placeholder:c.noun+' title'}),a=h('input',{placeholder:mv?'year (e.g. 1999)':'author',inputmode:mv?'numeric':'text'}),
+  s=h('select',{},c.st.map(([v,l])=>h('option',{value:v},l)));s.value=c.st[1][0];const btn=h('button',{cls:'b'},'add');
+ const add=async()=>{const title=t.value.trim();if(!title)return;btn.disabled=true;btn.textContent='looking up…';
+  const typed=a.value.trim();let info=null;try{info=mv?await lookupMovie(title,typed):await lookupBook(title,typed)}catch(e){info=null}
   const it={id:uid(),title,st:s.value,by:'',year:'',img:(info&&info.img)||''};
   if(mv){it.year=typed||(info&&info.year)||'';it.by=(info&&info.by)||''}else{it.by=typed||(info&&info.by)||'';it.year=(info&&info.year)||''}
-  note=info&&info.off?'Movie lookup is off — add a TMDB key at the top of the script to fill in director and poster.':(!info?'No match found online, so it was added without details.':'');
-  D[k].unshift(it);save();render()};
+  note=info?'':'no match found online, so it was added without details.';D[k].unshift(it);save();render()};
  btn.addEventListener('click',add);t.addEventListener('keydown',e=>e.key==='Enter'&&add());
  const out=[h('div',{cls:'card'},h('div',{cls:'row'},t),h('div',{cls:'row'},a),h('div',{cls:'row',style:'margin:0'},s,btn),n?h('div',{cls:'empty'},n):null)];
  for(const[v,l]of c.st){const items=D[k].filter(x=>x.st===v);
   out.push(h('h2',{},l+' ('+items.length+')'),h('div',{cls:'card'},items.length?items.map(x=>{const sub=[x.by,x.year].filter(Boolean).join(' · ');
    return h('div',{cls:'item'},x.img?h('img',{cls:'cover',src:x.img,alt:'',loading:'lazy',on:{error:e=>{e.target.style.visibility='hidden'}}}):null,
-    h('div',{cls:'t'},x.title,sub?h('small',{},sub):null),
+    h('div',{cls:'t'},h('span',{cls:'keep'},x.title),sub?h('small',{},sub):null),
     h('select',{on:{change:e=>{x.st=e.target.value;save();render()}}},c.st.map(([v2,l2])=>{const o=h('option',{value:v2},l2);if(v2===x.st)o.selected=true;return o})),
-    h('button',{cls:'x','aria-label':'Delete',on:{click:()=>{D[k]=D[k].filter(y=>y!==x);save();render()}}},'×'))}):h('div',{cls:'empty'},'Nothing here yet.')))}
- out.push(h('div',{cls:'empty',style:'margin-top:16px'},mv?'Movie info & posters: TMDB. Titles you add are sent to TMDB to look them up.':'Book info & covers: Open Library. Titles you add are sent to Open Library to look them up.'));
+    h('button',{cls:'x','aria-label':'delete',on:{click:()=>{D[k]=D[k].filter(y=>y!==x);save();render()}}},'×'))}):h('div',{cls:'empty'},'nothing here yet.')))}
+ out.push(h('div',{cls:'empty',style:'margin-top:16px'},mv?'movie info comes from wikipedia/wikidata (or omdb if you add a key). the title you type is sent there to look it up.':'book info and covers come from open library. the title you type is sent there to look it up.'));
  return out}
 
+// ---- to-do ----
 function taskList(list,ph){const inp=h('input',{placeholder:ph});
  const add=()=>{if(!inp.value.trim())return;list.push({id:uid(),text:inp.value.trim(),done:false});save();render()};
  inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
  return h('div',{cls:'card'},list.length?list.map(x=>h('div',{cls:'item'+(x.done?' done':'')},
   h('input',{type:'checkbox',checked:x.done,on:{change:e=>{x.done=e.target.checked;save();render()}}}),h('div',{cls:'t'},x.text),
-  h('button',{cls:'x','aria-label':'Delete',on:{click:()=>{list.splice(list.indexOf(x),1);save();render()}}},'×'))):h('div',{cls:'empty'},'Nothing yet.'),
-  h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'Add')))}
-
-function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].tasks.length+D.days[k].daily.length).sort().reverse();
+  h('button',{cls:'x','aria-label':'delete',on:{click:()=>{list.splice(list.indexOf(x),1);save();render()}}},'×'))):h('div',{cls:'empty'},'nothing yet.'),
+  h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add')))}
+function dailyCard(){const items=D.daily.filter(t=>t.from<=day&&(!t.until||day<t.until)),dd=DAY().dd,inp=h('input',{placeholder:'add a daily task (repeats every day)'});
+ const add=()=>{const v=inp.value.trim();if(!v)return;D.daily.push({id:uid(),text:v,from:day});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ return h('div',{cls:'card'},items.length?items.map(t=>{const on=dd.includes(t.id);return h('div',{cls:'item'+(on?' done':'')},
+  h('input',{type:'checkbox',checked:on,on:{change:e=>{const i=dd.indexOf(t.id);if(e.target.checked&&i<0)dd.push(t.id);if(!e.target.checked&&i>=0)dd.splice(i,1);save();render()}}}),h('div',{cls:'t'},t.text),
+  h('button',{cls:'x','aria-label':'remove from this day onward',on:{click:()=>{if(t.from>=day)D.daily=D.daily.filter(y=>y!==t);else t.until=day;save();render()}}},'×'))}):h('div',{cls:'empty'},'nothing yet.'),
+  h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add')))}
+function backlogSec(){const open=D.backlog.filter(x=>!x.done),inp=h('input',{placeholder:'something for down-time'});
+ const add=()=>{const v=inp.value.trim();if(!v)return;D.backlog.push({id:uid(),text:v,added:today(),done:false});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ const age=a=>Math.max(0,Math.round((new Date(today())-new Date(a))/864e5));
+ const d=h('details',{},h('summary',{},'backlog ('+open.length+')'),h('div',{cls:'card'},open.length?open.map(x=>h('div',{cls:'item'},
+  h('input',{type:'checkbox',on:{change:()=>{x.done=true;x.doneOn=today();save();render()}}}),h('div',{cls:'t'},x.text,h('small',{},'added '+x.added+' · '+age(x.added)+'d ago')),
+  h('button',{cls:'x','aria-label':'delete',on:{click:()=>{D.backlog=D.backlog.filter(y=>y!==x);save();render()}}},'×'))):h('div',{cls:'empty'},'nothing waiting. tick an item to clear it for good.'),
+  h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add'))));
+ if(blOpen)d.setAttribute('open','');d.addEventListener('toggle',()=>{blOpen=d.open});return d}
+function todoTab(){const d=DAY(),past=Object.keys(D.days).filter(k=>D.days[k].tasks.length+D.days[k].dd.length).sort().reverse();
  const dp=h('input',{type:'date',value:day,on:{change:e=>{if(e.target.value){day=e.target.value;render()}}}});
  return[h('div',{cls:'date'},h('button',{cls:'b',on:{click:()=>{day=shift(day,-1);render()}}},'‹'),h('div',{style:'text-align:center'},h('strong',{},fmt(day)),h('div',{},dp)),h('button',{cls:'b',on:{click:()=>{day=shift(day,1);render()}}},'›')),
-  day!==today()?h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{day=today();render()}}},'Jump to today')):null,
-  h('h2',{},'To-do'),taskList(d.tasks,'Add a task for this day'),
-  h('h2',{},'Daily tasks (this day only)'),taskList(d.daily,'Add a daily task'),
-  h('h2',{},'Past entries'),h('div',{cls:'chips'},past.length?past.map(k=>h('button',{cls:'chip'+(k===day?' on':''),on:{click:()=>{day=k;render()}}},k)):h('span',{cls:'empty'},'Entries you add will be listed here.'))]}
+  day!==today()?h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{day=today();render()}}},'jump to today')):null,
+  h('h2',{},'to-do'),taskList(d.tasks,'add a task for this day'),
+  h('h2',{},'daily tasks (carry forward until removed)'),dailyCard(),
+  h('h2',{},'past entries'),h('div',{cls:'chips'},past.length?past.map(k=>h('button',{cls:'chip'+(k===day?' on':''),on:{click:()=>{day=k;render()}}},k)):h('span',{cls:'empty'},'entries you add will be listed here.')),
+  h('div',{style:'margin-top:18px'},backlogSec())]}
 
-function projectsTab(){
- const p=openP&&D.projects.find(x=>x.id===openP);
- if(p){return[h('button',{cls:'chip',on:{click:()=>{openP=null;render()}}},'‹ All projects'),
-  h('h2',{},'Title'),h('input',{value:p.title,placeholder:'Title',style:'width:100%;font-weight:700',on:{input:e=>{p.title=e.target.value;save()}}}),
-  h('h2',{},'Description'),h('textarea',{rows:'4',placeholder:'What is this project about?',value:p.desc||'',on:{input:e=>{p.desc=e.target.value;save()}}}),
-  h('h2',{},'To-do'),taskList(p.todos,'Add a to-do item'),
-  h('div',{style:'margin-top:20px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('Delete this project?')){D.projects=D.projects.filter(x=>x!==p);openP=null;save();render()}}}},'Delete project'))]}
- openP=null;const n=h('input',{placeholder:'New project title'});
- const add=()=>{const title=n.value.trim();if(!title)return;const np={id:uid(),title,desc:'',todos:[]};D.projects.unshift(np);openP=np.id;save();render()};
- n.addEventListener('keydown',e=>e.key==='Enter'&&add());
- return[h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},n,h('button',{cls:'b',on:{click:add}},'Add'))),
-  h('h2',{},'Projects ('+D.projects.length+')'),
-  h('div',{cls:'card'},D.projects.length?D.projects.map(x=>{const open=x.todos.filter(t=>!t.done).length;
-   return h('div',{cls:'item'},h('div',{cls:'t proj',on:{click:()=>{openP=x.id;render()}}},x.title||'Untitled'),h('small',{style:'color:var(--mut)'},open+' open'))}):h('div',{cls:'empty'},'No projects yet.'))]}
+// ---- day-projects ----
+function projectsTab(){const p=openP&&D.projects.find(x=>x.id===openP);
+ if(p)return[h('button',{cls:'chip',on:{click:()=>{openP=null;render()}}},'‹ all projects'),
+  h('h2',{},'title'),h('input',{value:p.title,placeholder:'title',style:'width:100%;font-weight:700',on:{input:e=>{p.title=e.target.value;save()}}}),
+  h('h2',{},'description'),h('textarea',{rows:'4',placeholder:'what is this project about?',value:p.desc||'',on:{input:e=>{p.desc=e.target.value;save()}}}),
+  h('h2',{},'to-do'),taskList(p.todos,'add a to-do item'),
+  h('div',{style:'margin-top:20px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('delete this project?')){D.projects=D.projects.filter(x=>x!==p);openP=null;save();render()}}}},'delete project'))];
+ openP=null;const n=h('input',{placeholder:'new project title'});
+ const add=()=>{const title=n.value.trim();if(!title)return;const np={id:uid(),title,desc:'',todos:[]};D.projects.unshift(np);openP=np.id;save();render()};n.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ return[h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},n,h('button',{cls:'b',on:{click:add}},'add'))),h('h2',{},'projects ('+D.projects.length+')'),
+  h('div',{cls:'card'},D.projects.length?D.projects.map(x=>h('div',{cls:'item'},h('div',{cls:'t proj',on:{click:()=>{openP=x.id;render()}}},x.title||'untitled'),h('small',{style:'color:var(--mut)'},x.todos.filter(t=>!t.done).length+' open'))):h('div',{cls:'empty'},'no projects yet.'))]}
 
-function habitsTab(){const n=h('input',{placeholder:'New habit (e.g. Meditate)'});
- const add=()=>{const name=n.value.trim();if(!name)return;const id=uid();D.habits.push({id,name,done:{}});save();tab='h:'+id;render()};
- n.addEventListener('keydown',e=>e.key==='Enter'&&add());
- return[h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},n,h('button',{cls:'b',on:{click:add}},'Add habit'))),
-  h('h2',{},'Your habits'),h('div',{cls:'card'},D.habits.length?D.habits.map(x=>h('div',{cls:'item'},
-   h('div',{cls:'t proj',on:{click:()=>{tab='h:'+x.id;render()}}},x.name),
-   h('button',{cls:'x','aria-label':'Delete',on:{click:()=>{if(confirm('Delete "'+x.name+'" and its history?')){D.habits=D.habits.filter(y=>y!==x);save();render()}}}},'×'))):h('div',{cls:'empty'},'Add your first habit above — each one gets its own tab.'))]}
-
-function habitYear(hb){
- const cnt=h('div',{cls:'empty',style:'text-align:center;margin-top:6px'}),td=today();
- const upd=()=>{const c=Object.keys(hb.done).filter(k=>k.startsWith(hy+'-')).length;cnt.textContent=c+' day'+(c===1?'':'s')+' in '+hy};
- const months=h('div',{cls:'months'});
- for(let m=0;m<12;m++){const first=new Date(hy,m,1).getDay(),nd=new Date(hy,m+1,0).getDate();
-  const cal=h('div',{cls:'cal'},['S','M','T','W','T','F','S'].map(w=>h('span',{},w)));
+// ---- habits ----
+const mname=(y,m)=>new Date(y,m,1).toLocaleDateString(undefined,{month:'long'});
+function habitCal(hb){const td=today(),cells={},
+ cnt=h('div',{cls:'empty',style:'text-align:center;margin:6px 0'}),panel=h('div',{cls:'card',style:'margin:8px 0'});
+ const upd=()=>{const pre=hCal.year?hCal.y+'-':hCal.y+'-'+pad(hCal.m+1)+'-',c=Object.keys(hb.done).filter(k=>k.startsWith(pre)).length;
+  cnt.textContent=c+' day'+(c===1?'':'s')+' in '+(hCal.year?hCal.y:mname(hCal.y,hCal.m)+' '+hCal.y)};
+ const paint=()=>{for(const[k,b]of Object.entries(cells))b.className=(hb.done[k]?'on ':'')+(hb.desc[k]?'dot ':'')+(k===td?'today ':'')+(k===hCal.sel?'sel':'')};
+ const draw=()=>{panel.replaceChildren();const k=hCal.sel;if(!k){panel.append(h('div',{cls:'empty'},'tap a date to mark it done, then write what you did.'));return}
+  const lab=()=>hb.done[k]?'performed ✓':'not performed',tg=h('button',{cls:'chip'+(hb.done[k]?' on':''),on:{click:()=>{if(hb.done[k])delete hb.done[k];else hb.done[k]=1;tg.className='chip'+(hb.done[k]?' on':'');tg.textContent=lab();save();paint();upd()}}},lab());
+  panel.append(h('div',{cls:'row',style:'justify-content:space-between;align-items:center'},h('strong',{},fmt(k)),tg),
+   h('textarea',{rows:'3',placeholder:'what did you do?',value:hb.desc[k]||'',on:{input:e=>{const v=e.target.value;if(v.trim())hb.desc[k]=v;else delete hb.desc[k];save();paint()}}}))};
+ const pick=k=>{hCal.sel=k;if(!hb.done[k])hb.done[k]=1;save();paint();draw();upd()};
+ const month=(y,m)=>{const first=new Date(y,m,1).getDay(),nd=new Date(y,m+1,0).getDate(),cal=h('div',{cls:'cal'},['s','m','t','w','t','f','s'].map(w=>h('span',{},w)));
   for(let i=0;i<first;i++)cal.append(h('i'));
-  for(let d=1;d<=nd;d++){const key=hy+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-   const b=h('button',{cls:(hb.done[key]?'on ':'')+(key===td?'today':''),'aria-label':key,on:{click:()=>{if(hb.done[key])delete hb.done[key];else hb.done[key]=1;b.classList.toggle('on');save();upd()}}},String(d));
-   cal.append(b)}
-  months.append(h('div',{cls:'card mo'},h('h3',{},new Date(hy,m,1).toLocaleDateString(undefined,{month:'long'})),cal))}
- upd();
- return[h('div',{cls:'date'},h('button',{cls:'b',on:{click:()=>{hy--;render()}}},'‹'),h('strong',{},String(hy)),h('button',{cls:'b',on:{click:()=>{hy++;render()}}},'›')),
-  cnt,months,h('div',{style:'margin-top:20px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('Delete "'+hb.name+'" and its history?')){D.habits=D.habits.filter(y=>y!==hb);tab='habits';save();render()}}}},'Delete this habit'))]}
+  for(let d=1;d<=nd;d++){const k=ymd(y,m,d),b=h('button',{'aria-label':k,on:{click:()=>pick(k)}},String(d));cells[k]=b;cal.append(b)}
+  return h('div',{cls:'card mo'},h('h3',{},mname(y,m)+' '+y),cal)};
+ const go=n=>{if(hCal.year)hCal.y+=n;else{hCal.m+=n;if(hCal.m<0){hCal.m=11;hCal.y--}if(hCal.m>11){hCal.m=0;hCal.y++}}render()};
+ const grid=h('div',{cls:'months'+(hCal.year?'':' single')});
+ if(hCal.year)for(let m=0;m<12;m++)grid.append(month(hCal.y,m));else grid.append(month(hCal.y,hCal.m));
+ paint();draw();upd();
+ return[h('div',{cls:'date'},h('button',{cls:'b',on:{click:()=>go(-1)}},'‹'),h('strong',{},hCal.year?String(hCal.y):mname(hCal.y,hCal.m)+' '+hCal.y),h('button',{cls:'b',on:{click:()=>go(1)}},'›')),
+  h('div',{style:'text-align:center;margin-top:8px'},h('button',{cls:'chip',on:{click:()=>{hCal.year=!hCal.year;render()}}},hCal.year?'month view':'year view')),cnt,panel,grid]}
+function habitNotes(hb){const out=[h('div',{style:'margin-bottom:8px'},h('button',{cls:'b',on:{click:()=>{hb.notes.unshift({id:uid(),text:'',at:today(),att:[]});save();render()}}},'new note'))];
+ if(!hb.notes.length)out.push(h('div',{cls:'empty'},'no notes yet. attach audio, pdfs or word files, or paste links.'));
+ for(const n of hb.notes){const links=h('div',{cls:'links'}),paint=()=>links.replaceChildren(...(n.text.match(/https?:\/\/[^\s]+/g)||[]).map(u=>h('a',{href:u,target:'_blank',rel:'noopener noreferrer'},u)));paint();
+  out.push(h('div',{cls:'card',style:'margin-bottom:10px'},h('div',{cls:'row',style:'justify-content:space-between;align-items:center;margin:0 0 6px'},h('small',{style:'color:var(--mut)'},n.at),
+   h('button',{cls:'x','aria-label':'delete note',on:{click:()=>{if(confirm('delete this note?')){delFiles(n.att);hb.notes=hb.notes.filter(y=>y!==n);save();render()}}}},'×')),
+   h('textarea',{rows:'4',placeholder:'write a note, paste links…',value:n.text,on:{input:e=>{n.text=e.target.value;save();paint()}}}),links,attachUI(n)))}
+ return out}
+function habitDaily(hb){const td=today(),tk=hb.ticks[td]=hb.ticks[td]||[],inp=h('input',{placeholder:'add a daily item'});
+ const add=()=>{const v=inp.value.trim();if(!v)return;hb.daily.push({id:uid(),text:v,att:[]});save();render()};inp.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ return[h('div',{cls:'empty'},'a checklist for this habit. checks reset each day ('+td+').'),
+  h('div',{cls:'card'},hb.daily.length?hb.daily.map(x=>{const on=tk.includes(x.id);return h('div',{cls:'item'+(on?' done':''),style:'flex-wrap:wrap'},
+   h('input',{type:'checkbox',checked:on,on:{change:e=>{const i=tk.indexOf(x.id);if(e.target.checked&&i<0)tk.push(x.id);if(!e.target.checked&&i>=0)tk.splice(i,1);save();render()}}}),h('div',{cls:'t'},x.text),
+   h('button',{cls:'x','aria-label':'delete',on:{click:()=>{delFiles(x.att);hb.daily=hb.daily.filter(y=>y!==x);save();render()}}},'×'),h('div',{style:'width:100%;padding-left:28px'},attachUI(x)))}):h('div',{cls:'empty'},'nothing yet.'),
+   h('div',{cls:'row',style:'margin:8px 0 0'},inp,h('button',{cls:'b',on:{click:add}},'add')))]}
+function habitsTab(){const n=h('input',{placeholder:'new habit (e.g. meditate)'});
+ const add=()=>{const name=n.value.trim();if(!name)return;const id=uid();D.habits.push({id,name,done:{},desc:{},notes:[],daily:[],ticks:{}});hid=id;hsub='calendar';
+  hCal={y:new Date().getFullYear(),m:new Date().getMonth(),year:false,sel:null};save();render()};n.addEventListener('keydown',e=>e.key==='Enter'&&add());
+ const out=[h('div',{cls:'card'},h('div',{cls:'row',style:'margin:0'},n,h('button',{cls:'b',on:{click:add}},'add habit'))),
+  chipRow(D.habits.map(x=>[x.id,x.name]),hid,k=>{hid=k;hsub='calendar';hCal.sel=null;render()})];
+ const hb=D.habits.find(x=>x.id===hid);
+ if(!hb){hid=null;out.push(h('div',{cls:'empty'},D.habits.length?'pick a habit above.':'add your first habit above.'));return out}
+ out.push(h('h2',{},hb.name),chipRow([['calendar','calendar'],['notes','notes'],['daily','daily']],hsub,k=>{hsub=k;render()}),
+  ...(hsub==='calendar'?habitCal(hb):hsub==='notes'?habitNotes(hb):habitDaily(hb)),
+  h('div',{style:'margin-top:24px'},h('button',{cls:'chip',on:{click:()=>{if(confirm('delete "'+hb.name+'" and everything in it?')){delFiles([...hb.notes.flatMap(x=>x.att||[]),...hb.daily.flatMap(x=>x.att||[])]);D.habits=D.habits.filter(y=>y!==hb);hid=null;save();render()}}}},'delete this habit')));
+ return out}
+
+// ---- inventory ----
+function editTable(arr,cols,first,onDel){
+ const rows=arr.map(x=>h('tr',{},first?h('td',{},first(x)):null,...cols.map(([k])=>h('td',{},h('input',{cls:'cell',value:x[k]||'',on:{input:e=>{x[k]=e.target.value;save()}}}))),
+  h('td',{},h('button',{cls:'x','aria-label':'delete',on:{click:()=>{if(confirm('delete this item?'))onDel(x)}}},'×'))));
+ return h('div',{style:'overflow-x:auto'},h('table',{cls:'tbl'},h('thead',{},h('tr',{},first?h('th',{},'pictures'):null,...cols.map(([,l])=>h('th',{},l)),h('th',{}))),h('tbody',{},...rows)))}
+function quickAdd(fields,add){const ins=fields.map(([k,ph,list])=>{const i=h('input',{placeholder:ph});if(list)i.setAttribute('list',list);return i}),btn=h('button',{cls:'b'},'add');
+ const go=()=>{if(!ins[0].value.trim())return;const o={};fields.forEach(([k],i)=>o[k]=ins[i].value.trim());add(o);save();render()};
+ btn.addEventListener('click',go);ins.forEach(i=>i.addEventListener('keydown',e=>e.key==='Enter'&&go()));
+ return h('div',{cls:'card',style:'margin-bottom:10px'},h('div',{cls:'frm'},...ins),btn)}
+function clothesCat(c){const items=D.inv.clothes.filter(x=>x.cat===c);
+ const f={name:h('input',{placeholder:'item name'}),price:h('input',{placeholder:'price',inputmode:'decimal'}),size:h('input',{placeholder:'size'}),company:h('input',{placeholder:'company'})};
+ const files=h('input',{type:'file',accept:'image/*',multiple:''}),btn=h('button',{cls:'b'},'add item');
+ btn.addEventListener('click',async()=>{if(!f.name.value.trim())return;btn.disabled=true;btn.textContent='uploading…';
+  try{const imgs=[];for(const file of[...files.files].slice(0,3))imgs.push(await addFile(file));
+   D.inv.clothes.push({id:uid(),cat:c,name:f.name.value.trim(),price:f.price.value.trim(),size:f.size.value.trim(),company:f.company.value.trim(),imgs});save()}
+  catch(e){alert('upload failed: '+(e.message||e))}render()});
+ const pics=x=>{const fi=h('input',{type:'file',accept:'image/*',style:'display:none',on:{change:async e=>{const file=e.target.files[0];if(!file)return;try{x.imgs.push(await addFile(file));save()}catch(err){alert('upload failed: '+(err.message||err))}render()}}});
+  return h('div',{cls:'pics'},...x.imgs.map(m=>h('img',{cls:'thumb',src:m.thumb||'',alt:'',on:{click:()=>lightbox(m,()=>{x.imgs=x.imgs.filter(y=>y!==m);delFiles([m]);save();render()})}})),x.imgs.length<3?h('button',{cls:'chip',on:{click:()=>fi.click()}},'+'):null,fi)};
+ const d=h('details',{},h('summary',{},c+' ('+items.length+')'),h('div',{cls:'card'},h('div',{cls:'frm'},f.name,f.price,f.size,f.company),
+  h('div',{cls:'row',style:'align-items:center'},files,btn),h('div',{cls:'empty',style:'margin-bottom:8px'},'up to 3 pictures. tap one later to see it full size.'),
+  items.length?editTable(items,[['name','item'],['price','price'],['size','size'],['company','company']],pics,x=>{D.inv.clothes=D.inv.clothes.filter(y=>y!==x);delFiles(x.imgs);save();render()}):h('div',{cls:'empty'},'nothing here yet.')));
+ if(catOpen[c])d.setAttribute('open','');d.addEventListener('toggle',()=>{catOpen[c]=d.open});return d}
+function inventoryTab(){const out=[chipRow([['clothes','clothes'],['bathroom','bathroom items'],['cables','cables']],invTab,k=>{invTab=k;render()})];
+ if(invTab==='clothes')CATS.forEach(c=>out.push(clothesCat(c)));
+ else if(invTab==='bathroom'){const cats=[...new Set(D.inv.bathroom.map(x=>x.category).filter(Boolean))];
+  out.push(h('datalist',{id:'bcats'},cats.map(c=>h('option',{value:c}))),quickAdd([['item','item'],['category','category','bcats']],o=>D.inv.bathroom.push({id:uid(),...o})),
+   D.inv.bathroom.length?editTable(D.inv.bathroom,[['item','item'],['category','category']],null,x=>{D.inv.bathroom=D.inv.bathroom.filter(y=>y!==x);save();render()}):h('div',{cls:'empty'},'nothing here yet.'))}
+ else out.push(quickAdd([['item','cable']],o=>D.inv.cables.push({id:uid(),...o})),
+  D.inv.cables.length?editTable(D.inv.cables,[['item','item']],null,x=>{D.inv.cables=D.inv.cables.filter(y=>y!==x);save();render()}):h('div',{cls:'empty'},'nothing here yet.'));
+ return out}
 
 function render(){const app=$('#app');let title,body;
- if(tab==='todo'){title='To-do';body=todoTab()}
- else if(tab==='projects'){title='Day-projects';body=projectsTab()}
- else if(tab==='habits'){title='Habit tracker';body=habitsTab()}
- else if(tab.startsWith('h:')){const hb=D.habits.find(x=>x.id===tab.slice(2));if(!hb){tab='habits';return render()}title=hb.name;body=habitYear(hb)}
- else{title=tab==='books'?'Books':'Movies';body=mediaTab(tab)}
+ if(tab==='todo'){title='to-do';body=todoTab()}else if(tab==='projects'){title='day-projects';body=projectsTab()}
+ else if(tab==='habits'){title='habit tracker';body=habitsTab()}else if(tab==='inventory'){title='inventory';body=inventoryTab()}
+ else{if(tab!=='books'&&tab!=='movies')tab='books';title=tab;body=mediaTab(tab)}
  app.replaceChildren(h('h1',{},title),...body,h('div',{id:'status',style:'margin-top:24px'},syncMsg),
-  h('div',{cls:'chips',style:'margin-top:10px'},h('button',{cls:'chip',on:{click:lockVault}},'Lock'),h('button',{cls:'chip',on:{click:signOut}},'Sign out')));
- const tabs=[['books','Books'],['todo','To-do'],['movies','Movies'],['projects','Day-projects'],['habits','Habits'],...D.habits.map(x=>['h:'+x.id,x.name])];
- const n=$('#nav');n.replaceChildren(...tabs.map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;render();scrollTo(0,0)}}},l)));
+  h('div',{cls:'chips',style:'margin-top:10px'},h('button',{cls:'chip',on:{click:lockVault}},'lock'),h('button',{cls:'chip',on:{click:signOut}},'sign out')));
+ const n=$('#nav');n.replaceChildren(...[['books','books'],['todo','to-do'],['movies','movies'],['projects','day-projects'],['habits','habits'],['inventory','inventory']].map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;render();scrollTo(0,0)}}},l)));
  const on=n.querySelector('.on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'center',block:'nearest'})}
 
 (async function boot(){
