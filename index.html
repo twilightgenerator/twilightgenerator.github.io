@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lifelog</title>
+<script>window.addEventListener("error",function(e){var l=document.getElementById("lock");if(l&&!l.textContent.trim()){l.style.padding="20px";l.textContent="Startup error: "+e.message}});window.addEventListener("unhandledrejection",function(e){var l=document.getElementById("lock");if(l&&!l.textContent.trim()){l.style.padding="20px";l.textContent="Startup error: "+((e.reason&&e.reason.message)||e.reason)}})</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
 :root{--bg:#faf8f4;--card:#fff;--ink:#222;--mut:#777;--line:#e6e1d8;--acc:#3b6e5a;--accT:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -153,8 +154,12 @@ function render(){const app=$('#app');
  const n=$('#nav');n.replaceChildren(...[['books','Books'],['todo','To-do'],['movies','Movies']].map(([k,l])=>h('button',{cls:tab===k?'on':'',on:{click:()=>{tab=k;render();scrollTo(0,0)}}},l)))}
 
 (async function boot(){
- if(SUPABASE_URL.startsWith('YOUR_')){authScreen('in');return}
- sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
- const{data}=await sb.auth.getSession();
- if(data.session){user=data.session.user;unlockScreen()}else authScreen('in')})();
+ try{
+  if(SUPABASE_URL.startsWith('YOUR_')){authScreen('in');return}
+  if(!window.supabase)throw new Error('The Supabase library did not load (ad blocker, firewall, or offline).');
+  sb=supabase.createClient(SUPABASE_URL.trim(),SUPABASE_ANON_KEY.trim());
+  const{data}=await sb.auth.getSession();
+  if(data.session){user=data.session.user;unlockScreen()}else authScreen('in')
+ }catch(e){$('#lock').replaceChildren(h('h1',{},'Lifelog'),h('p',{cls:'err'},'Startup error: '+(e.message||e)),h('p',{},'Check that the Supabase URL and key at the top of the script are pasted exactly, inside the quotes.'))}
+})();
 </script></body></html>
